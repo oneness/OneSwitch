@@ -2,15 +2,16 @@ import Cocoa
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let windowManager = WindowManager()
+    private let windowHistory = WindowHistory()
     private var hotKeyManager: HotKeyManager!
     private var switcher: SwitcherPanelController!
     private var statusBar: StatusBarController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusBar = StatusBarController()
-        switcher = SwitcherPanelController(windowManager: windowManager)
+        switcher = SwitcherPanelController(windowManager: windowManager, history: windowHistory)
         hotKeyManager = HotKeyManager { [weak self] in
-            self?.switcher.toggle()
+            self?.switcher.handleHotkey()
         }
         hotKeyManager.register()
 
