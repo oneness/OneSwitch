@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>OneSwitch</string>
+    <key>CFBundleIdentifier</key>
+    <string>health.legion.OneSwitch</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>OneSwitch</string>
+    <key>CFBundleDisplayName</key>
+    <string>OneSwitch</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <!-- Accessory app: no Dock icon, behaves like a background utility. -->
+    <key>LSUIElement</key>
+    <true/>
+    <!-- Shown in the macOS Automation permission prompt for Chrome. -->
+    <key>NSAppleEventsUsageDescription</key>
+    <string>OneSwitch reads your Google Chrome tabs so it can list and switch to them.</string>
+</dict>
+</plist>

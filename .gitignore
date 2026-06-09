@@ -1,0 +1,15 @@
+# SwiftPM build artifacts
+.build/
+Package.resolved
+
+# Built app bundle (produced by scripts/build-app.sh)
+OneSwitch.app/
+
+# macOS
+.DS_Store
+
+# Local Claude config
+.claude/
+
+# Runtime diagnostics
+/tmp/oneswitch*.log
