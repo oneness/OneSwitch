@@ -13,3 +13,7 @@ OneSwitch.app/
 
 # Runtime diagnostics
 /tmp/oneswitch*.log
+
+# Intermediate icon artifacts (regenerate via scripts/make-icon.swift; .icns is committed)
+AppIcon.iconset/
+icon-preview.png

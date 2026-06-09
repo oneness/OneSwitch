@@ -22,9 +22,10 @@ BIN="$(swift build -c "$CONFIG" --show-bin-path)/OneSwitch"
 
 echo "Assembling ${APP}..."
 rm -rf "$APP"
-mkdir -p "${APP}/Contents/MacOS"
+mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources"
 cp "$BIN" "${APP}/Contents/MacOS/OneSwitch"
 cp Resources/Info.plist "${APP}/Contents/Info.plist"
+cp Resources/AppIcon.icns "${APP}/Contents/Resources/AppIcon.icns"
 
 echo "Signing..."
 codesign --force --sign "$IDENTITY" --timestamp=none "$APP"
