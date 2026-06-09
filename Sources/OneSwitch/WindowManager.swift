@@ -13,6 +13,10 @@ struct WindowItem {
     let tabIndex: Int?
     /// Reference to a specific window (via the Accessibility API) so we can raise exactly it.
     var axWindow: AXUIElement? = nil
+    /// The owning app's icon, shown in the switcher row.
+    var icon: NSImage? = nil
+    /// For browser tabs: a URL to fetch the page's favicon (loaded lazily).
+    var faviconURL: URL? = nil
 }
 
 class WindowManager {
@@ -53,7 +57,7 @@ class WindowManager {
                 // Fallback: no AX windows available — keep the app reachable as one entry.
                 items.append(WindowItem(id: "app-\(app.processIdentifier)", title: name,
                                         ownerName: name, pid: app.processIdentifier,
-                                        isTab: false, tabIndex: nil))
+                                        isTab: false, tabIndex: nil, icon: app.icon))
                 continue
             }
 
@@ -64,7 +68,7 @@ class WindowManager {
                 let title = rawTitle.isEmpty ? name : rawTitle
                 items.append(WindowItem(id: "win-\(app.processIdentifier)-\(idx)", title: title,
                                         ownerName: name, pid: app.processIdentifier,
-                                        isTab: false, tabIndex: nil, axWindow: window))
+                                        isTab: false, tabIndex: nil, axWindow: window, icon: app.icon))
             }
         }
         return items
@@ -75,6 +79,8 @@ class WindowManager {
     /// frontmost window, so its windows surface via getAccessibilityWindows() instead.
     func getBrowserTabs() -> [WindowItem] {
         var items = [WindowItem]()
+        let chromeIcon = NSWorkspace.shared.runningApplications
+            .first { $0.bundleIdentifier == "com.google.Chrome" }?.icon
 
         // Uses `linefeed` as the row separator (a raw newline inside an AppleScript
         // string literal is a syntax error).
@@ -85,7 +91,7 @@ class WindowManager {
             tell application "Google Chrome"
                 repeat with w in windows
                     repeat with t in tabs of w
-                        set output to output & "Chrome||" & (id of t as string) & "||" & (title of t) & linefeed
+                        set output to output & "Chrome||" & (id of t as string) & "||" & (URL of t) & "||" & (title of t) & linefeed
                     end repeat
                 end repeat
             end tell
@@ -104,12 +110,17 @@ class WindowManager {
                 let lines = text.components(separatedBy: "\n")
                 for line in lines where !line.isEmpty {
                     let parts = line.components(separatedBy: "||")
-                    if parts.count >= 3 {
+                    if parts.count >= 4 {
                         let browser = parts[0]
                         let tabId = parts[1]
-                        let title = parts[2...].joined(separator: "||").trimmingCharacters(in: .whitespaces)
+                        let urlString = parts[2]
+                        let title = parts[3...].joined(separator: "||").trimmingCharacters(in: .whitespaces)
                         guard !title.isEmpty else { continue }
-                        items.append(WindowItem(id: tabId, title: title, ownerName: browser, pid: 0, isTab: true, tabIndex: Int(tabId)))
+                        var favicon: URL?
+                        if let host = URL(string: urlString)?.host {
+                            favicon = URL(string: "https://icons.duckduckgo.com/ip3/\(host).ico")
+                        }
+                        items.append(WindowItem(id: tabId, title: title, ownerName: browser, pid: 0, isTab: true, tabIndex: Int(tabId), icon: chromeIcon, faviconURL: favicon))
                     }
                 }
             }

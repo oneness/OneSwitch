@@ -1,7 +1,9 @@
 import SwiftUI
+import AppKit
 
 struct SwitcherView: View {
     @ObservedObject var model: SwitcherModel
+    @ObservedObject private var favicons = FaviconCache.shared
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -48,9 +50,21 @@ struct SwitcherView: View {
     @ViewBuilder
     private func row(_ item: WindowItem, selected: Bool) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: item.isTab ? "globe" : "macwindow")
-                .foregroundStyle(selected ? Color.white : Color.secondary)
-                .frame(width: 20)
+            Group {
+                if let fav = item.faviconURL, let img = favicons.icon(for: fav) {
+                    Image(nsImage: img)            // page favicon (loads async, then swaps in)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                } else if let icon = item.icon {
+                    Image(nsImage: icon)           // app icon (also the placeholder for tabs)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                } else {
+                    Image(systemName: item.isTab ? "globe" : "macwindow")
+                        .foregroundStyle(selected ? Color.white : Color.secondary)
+                }
+            }
+            .frame(width: 22, height: 22)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title)
                     .lineLimit(1)
