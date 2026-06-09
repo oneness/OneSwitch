@@ -4,8 +4,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let windowManager = WindowManager()
     private var hotKeyManager: HotKeyManager!
     private var switcher: SwitcherPanelController!
+    private var statusBar: StatusBarController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        statusBar = StatusBarController()
         switcher = SwitcherPanelController(windowManager: windowManager)
         hotKeyManager = HotKeyManager { [weak self] in
             self?.switcher.toggle()
