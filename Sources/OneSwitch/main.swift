@@ -17,6 +17,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeyManager.register()
 
         let trusted = windowManager.ensureAccessibilityPermission()
+
+        // Firefox builds its AX tree only once told an assistive client exists — nudge it
+        // now if it's already running, and again whenever it launches (see
+        // enableFirefoxAccessibility). Without this, a Firefox started after OneSwitch
+        // lists only a bare window (no tabs) for a long while.
+        windowManager.enableFirefoxAccessibility()
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            if app?.localizedName == "Firefox" {
+                self?.windowManager.enableFirefoxAccessibility()
+            }
+        }
         // Launch diagnostic: when launched via `open`, stderr is detached, so AppLog also
         // records this to ~/Library/Logs/OneSwitch.log.
         let windows = windowManager.getAccessibilityWindows()

@@ -139,13 +139,28 @@ class WindowManager {
         return items
     }
 
+    private func runningFirefox() -> NSRunningApplication? {
+        NSWorkspace.shared.runningApplications
+            .first { $0.activationPolicy == .regular && $0.localizedName == "Firefox" }
+    }
+
+    /// Gecko gates its accessibility tree behind an "assistive client present" check: a
+    /// freshly launched Firefox exposes only a bare window (no tab buttons) to one-shot AX
+    /// queries, no matter how often they repeat. Setting AXEnhancedUserInterface on the app
+    /// element is the documented signal (used by AltTab, yabai, …) that makes Gecko build
+    /// the full tree. It builds asynchronously, so callers must re-query a moment later.
+    func enableFirefoxAccessibility() {
+        guard let firefox = runningFirefox() else { return }
+        let appElement = AXUIElementCreateApplication(firefox.processIdentifier)
+        AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
+    }
+
     /// Firefox tabs via the Accessibility API. Firefox has no per-tab scripting interface,
     /// but it exposes each tab as an AXRadioButton with subrole AXTabButton (title = tab
     /// title, AXSelected = active, AXPress switches to it) in the tab-strip toolbar.
     /// No URLs in the AX tree, so rows carry the Firefox icon instead of favicons.
     func getFirefoxTabs() -> [WindowItem] {
-        guard let firefox = NSWorkspace.shared.runningApplications
-            .first(where: { $0.activationPolicy == .regular && $0.localizedName == "Firefox" }) else { return [] }
+        guard let firefox = runningFirefox() else { return [] }
 
         let appElement = AXUIElementCreateApplication(firefox.processIdentifier)
         var value: CFTypeRef?
@@ -168,6 +183,11 @@ class WindowManager {
                                         icon: firefox.icon,
                                         isActiveTab: (selectedValue as? Bool) == true))
             }
+        }
+        if items.isEmpty {
+            // Bare tree (Firefox launched after our startup nudge) — ask Gecko to build it
+            // so the panel's delayed refresh, or the next hotkey press, sees the tabs.
+            AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
         }
         return items
     }

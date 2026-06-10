@@ -115,6 +115,11 @@ Grant once; the signed identity keeps them valid across rebuilds.
 - **Firefox tabs** come from the AX tree, which exposes no URLs — so no per-tab favicons,
   and a Firefox UI overhaul could require adjusting the lookup (if that happens, Firefox
   windows transparently fall back to one-row-per-window).
+- **Gecko builds its AX tree lazily**: a freshly launched Firefox exposes only a bare
+  window until an assistive client announces itself. OneSwitch sets
+  `AXEnhancedUserInterface` on Firefox (at startup, on Firefox launch, and whenever tab
+  enumeration comes up empty) to trigger the build; the tree appears within a few seconds,
+  and the open panel refreshes in place (0.6s/1.8s) to pick it up.
 - Tab-level support covers **Chrome and Firefox** (Safari/Arc not yet implemented).
 - Switching between two windows of the *same* app (without changing apps) fires no activation
   notification, so intra-app recency can lag until the switcher is next opened.

@@ -47,6 +47,17 @@ final class SwitcherPanelController {
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         installKeyMonitor()
+
+        // Some apps deliver AX data late (a freshly launched Firefox builds its tree only
+        // after our AXEnhancedUserInterface nudge) — refresh while the panel is open so the
+        // list self-corrects in place. Query and selection are preserved.
+        for delay in [0.6, 1.8] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.panel?.isVisible == true else { return }
+                self.model.refreshItems(self.orderedByRecency(self.windowManager.allItems()),
+                                        launchables: self.launchableApps())
+            }
+        }
     }
 
     private func hide() {

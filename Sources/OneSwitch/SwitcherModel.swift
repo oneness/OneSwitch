@@ -64,6 +64,20 @@ final class SwitcherModel: ObservableObject {
         selectedIndex = 0
     }
 
+    /// Replace the item pool while the panel is open, preserving the query and keeping the
+    /// selection on the same item where possible (used by the post-open refresh that picks
+    /// up late-arriving AX data, e.g. a freshly launched Firefox's tabs).
+    func refreshItems(_ newItems: [WindowItem], launchables newLaunchables: [WindowItem]) {
+        let selectedId = filtered.indices.contains(selectedIndex) ? filtered[selectedIndex].id : nil
+        items = newItems
+        launchables = newLaunchables
+        if let selectedId, let index = filtered.firstIndex(where: { $0.id == selectedId }) {
+            selectedIndex = index
+        } else {
+            selectedIndex = min(selectedIndex, max(0, filtered.count - 1))
+        }
+    }
+
     func moveSelection(_ delta: Int) {
         let count = filtered.count
         guard count > 0 else { return }
