@@ -27,11 +27,20 @@ final class FaviconCache: ObservableObject {
         return dir.appendingPathComponent(digest.map { String(format: "%02x", $0) }.joined())
     }
 
-    func icon(for url: URL) -> NSImage? {
-        let key = url.absoluteString
+    /// Favicon for a page, keyed by host. Tries DuckDuckGo's favicon service first (good
+    /// coverage, normalized sizes), then the site's own /favicon.ico (covers intranet and
+    /// private hosts DuckDuckGo has never seen).
+    func icon(forPage pageURL: URL) -> NSImage? {
+        guard let host = pageURL.host else { return nil }
+        let key = host
         if let image = images[key] { return image }
         guard !inFlight.contains(key) else { return nil }
         inFlight.insert(key)
+
+        let candidates = [
+            URL(string: "https://icons.duckduckgo.com/ip3/\(host).ico"),
+            URL(string: "\(pageURL.scheme ?? "https")://\(host)/favicon.ico"),
+        ].compactMap { $0 }
 
         ioQueue.async { [weak self] in
             guard let self else { return }
@@ -42,17 +51,25 @@ final class FaviconCache: ObservableObject {
                 self.store(image, key: key)
                 return
             }
-            // 2. Fetch, persist to disk, then cache in memory.
-            URLSession.shared.dataTask(with: url) { data, _, _ in
-                guard let data, let image = NSImage(data: data) else {
-                    DispatchQueue.main.async { self.inFlight.remove(key) }
-                    return
-                }
-                try? data.write(to: file)
-                self.store(image, key: key)
-            }.resume()
+            // 2. Fetch the first candidate that yields a decodable image, persist, cache.
+            self.fetchFirst(candidates, file: file, key: key)
         }
         return nil
+    }
+
+    private func fetchFirst(_ candidates: [URL], file: URL, key: String) {
+        guard let url = candidates.first else {
+            DispatchQueue.main.async { self.inFlight.remove(key) }
+            return
+        }
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            if let data, let image = NSImage(data: data), image.isValid {
+                try? data.write(to: file)
+                self.store(image, key: key)
+            } else {
+                self.fetchFirst(Array(candidates.dropFirst()), file: file, key: key)
+            }
+        }.resume()
     }
 
     private func store(_ image: NSImage, key: String) {

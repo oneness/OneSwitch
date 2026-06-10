@@ -16,16 +16,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeyManager.register()
 
         let trusted = windowManager.ensureAccessibilityPermission()
-        FileHandle.standardError.write("OneSwitch running. Press Control+Tab to open the switcher.\n".data(using: .utf8)!)
-        if !trusted {
-            FileHandle.standardError.write("Accessibility permission NOT granted — per-window listing will be limited. Grant it in System Settings ▸ Privacy & Security ▸ Accessibility, then relaunch.\n".data(using: .utf8)!)
-        }
-
-        // Launch diagnostic: when launched via `open`, stderr is detached, so record state to a file.
+        // Launch diagnostic: when launched via `open`, stderr is detached, so AppLog also
+        // records this to ~/Library/Logs/OneSwitch.log.
         let windows = windowManager.getAccessibilityWindows()
-        var report = "trusted: \(trusted), windows: \(windows.count)\n"
-        report += windows.prefix(25).map { "  WIN \($0.ownerName): \($0.title)" }.joined(separator: "\n") + "\n"
-        try? report.write(toFile: "/tmp/oneswitch-launch.log", atomically: true, encoding: .utf8)
+        AppLog.log("launched: accessibility trusted: \(trusted), windows: \(windows.count). Press Control+Tab to open the switcher.")
+        if !trusted {
+            AppLog.log("Accessibility permission NOT granted — per-window listing will be limited. Grant it in System Settings ▸ Privacy & Security ▸ Accessibility, then relaunch.")
+        }
     }
 }
 
@@ -36,8 +33,15 @@ if CommandLine.arguments.contains("--dump") {
     let tabs = wm.getBrowserTabs()
     let windows = wm.getAccessibilityWindows()
     FileHandle.standardError.write("accessibility trusted: \(trusted), chrome tabs: \(tabs.count), windows: \(windows.count)\n".data(using: .utf8)!)
-    for t in tabs { FileHandle.standardError.write("  TAB \(t.ownerName): \(t.title)\n".data(using: .utf8)!) }
+    for t in tabs { FileHandle.standardError.write("  TAB\(t.isActiveTab ? "*" : " ") \(t.ownerName) [win \(t.chromeWindowId ?? "?") tab \(t.chromeTabId ?? "?")]: \(t.title)\n".data(using: .utf8)!) }
     for w in windows { FileHandle.standardError.write("  WIN \(w.ownerName): \(w.title)\n".data(using: .utf8)!) }
+    exit(0)
+}
+
+// Diagnostic mode: focus a Chrome tab by id (as printed by --dump), then exit.
+if let flagIndex = CommandLine.arguments.firstIndex(of: "--focus-tab"),
+   CommandLine.arguments.count > flagIndex + 1 {
+    WindowManager().focusChromeTab(tabId: CommandLine.arguments[flagIndex + 1], windowId: nil)
     exit(0)
 }
 

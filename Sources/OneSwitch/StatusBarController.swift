@@ -17,7 +17,7 @@ enum LoginItem {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            FileHandle.standardError.write("Login item toggle failed: \(error)\n".data(using: .utf8)!)
+            AppLog.log("Login item toggle failed: \(error)")
         }
     }
 }

@@ -51,7 +51,7 @@ struct SwitcherView: View {
     private func row(_ item: WindowItem, selected: Bool) -> some View {
         HStack(spacing: 10) {
             Group {
-                if let fav = item.faviconURL, let img = favicons.icon(for: fav) {
+                if let page = item.pageURL, let img = favicons.icon(forPage: page) {
                     Image(nsImage: img)            // page favicon (loads async, then swaps in)
                         .resizable()
                         .aspectRatio(contentMode: .fit)

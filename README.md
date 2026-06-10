@@ -7,7 +7,8 @@ most-recently-used first.
 
 It lists:
 
-- **Google Chrome tabs** individually, with per-page favicons (via AppleScript)
+- **Google Chrome tabs** individually, with per-page favicons (via pid-addressed Apple
+  Events — see Diagnostics for why not AppleScript)
 - **Every app's windows** individually, with titles and app icons (via the Accessibility API)
 
 Runs as a background accessory app: no Dock icon, just a menu bar item.
@@ -19,9 +20,11 @@ Runs as a background accessory app: no Dock icon, just a menu bar item.
 - **Orderless fuzzy search** — type space-separated tokens in any order; every token must
   appear in the title or app name. Results are ranked (title matches, prefix/word-boundary
   matches, and shorter titles score higher).
-- **Real icons** — app icons for windows, page favicons for Chrome tabs. Favicons are fetched
-  from DuckDuckGo and cached two-tier (in-memory + on-disk under `~/Library/Caches`), so they
-  survive relaunches with no re-fetch.
+- **Real icons** — app icons for windows, page favicons for Chrome tabs. Favicons are
+  keyed by host, fetched from DuckDuckGo's favicon service with a fallback to the site's
+  own `/favicon.ico` (covers intranet/private hosts), and cached two-tier (in-memory +
+  on-disk under `~/Library/Caches`), so they survive relaunches with no re-fetch.
+  Non-web tabs (`chrome://…`) show the Chrome icon.
 - **Menu bar item** — toggle **Launch at Login** and quit from the status bar (the app has no
   Dock icon, so this is also the only quit affordance).
 
@@ -79,8 +82,13 @@ Grant once; the signed identity keeps them valid across rebuilds.
 
 ## Architecture
 
-- `WindowManager` — enumerates Chrome tabs (AppleScript) + app windows (Accessibility
-  API), and activates a selected item.
+- `WindowManager` — enumerates Chrome tabs (via `ChromeScripting`) + app windows
+  (Accessibility API), picks the user's real Chrome among multiple instances, and
+  activates a selected item.
+- `ChromeScripting` — pid-addressed raw Apple Events to one specific Chrome process:
+  list windows/tabs, read or set the active tab, raise a window (2s timeout per event).
+- `AppLog` — timestamped diagnostics to `~/Library/Logs/OneSwitch.log` (the app runs
+  headless, so stderr alone would be lost).
 - `WindowHistory` — tracks most-recently-used windows by `CGWindowID` (via app-activation
   notifications + explicit recording) so the list can sort by recency.
 - `FaviconCache` — two-tier (memory + disk) favicon cache, resolved off the main thread.
@@ -102,6 +110,26 @@ Grant once; the signed identity keeps them valid across rebuilds.
 
 ## Diagnostics
 
+Errors (Apple Events failures, timeouts, permission problems) are appended to
+`~/Library/Logs/OneSwitch.log` — the app runs headless, so this is the place to look
+when Chrome tabs go missing from the switcher. `--dump` marks each window's active
+tab with `*`.
+
 ```sh
-.build/debug/OneSwitch --dump   # print the tab/window list and permission status
+.build/debug/OneSwitch --dump            # print the tab/window list and permission status
+.build/debug/OneSwitch --focus-tab <id>  # focus a Chrome tab by id (ids shown by --dump)
 ```
+
+Chrome queries are sent as **pid-addressed raw Apple Events** (`ChromeScripting`), not
+AppleScript. `tell application "Google Chrome"` addresses by bundle id, and when a second
+Chrome process is running — e.g. the headless `--headless --user-data-dir=…` instance that
+browser-automation tooling spawns — macOS routes those events to an arbitrary instance,
+silently listing the wrong browser's tabs. OneSwitch picks the real instance itself
+(`activationPolicy == .regular`, longest-running) and addresses it by pid, which
+AppleScript cannot express. Events carry a 2s timeout so a wedged Chrome can't hang the
+switcher.
+
+AppleScript gotchas (for posterity): Chrome declares window/tab `id` as *text* in its
+sdef, but a single tab's `id of t` arrives as an *integer* — `"123" is 123` is false, so
+compare ids `as string`. And the `abso` ordinal in a raw object specifier keeps its OSType
+payload in native byte order.
