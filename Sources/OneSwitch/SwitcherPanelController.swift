@@ -12,6 +12,7 @@ final class SwitcherPanelController {
     private let windowManager: WindowManager
     private let history: WindowHistory
     private let model: SwitcherModel
+    private let appCatalog = AppCatalog()
     private var panel: NSPanel?
     private var keyMonitor: Any?
 
@@ -31,7 +32,7 @@ final class SwitcherPanelController {
     private func show() {
         history.captureFront()                              // keep recency current
         let items = orderedByRecency(windowManager.allItems())
-        model.setItems(items)                               // selection starts at the top
+        model.setItems(items, launchables: launchableApps())  // selection starts at the top
 
         let panel = self.panel ?? makePanel()
         self.panel = panel
@@ -57,6 +58,20 @@ final class SwitcherPanelController {
         if let window = item.axWindow { history.record(window) }
         hide()
         windowManager.activate(item: item)
+    }
+
+    /// Installed apps that are not running, as launch-on-Enter items. Running apps are
+    /// excluded — they are already covered by their window entries (or the windowless
+    /// app fallback). Only shown while searching.
+    private func launchableApps() -> [WindowItem] {
+        let runningURLs = Set(NSWorkspace.shared.runningApplications
+            .compactMap { $0.bundleURL?.standardizedFileURL })
+        return appCatalog.apps()
+            .filter { !runningURLs.contains($0.url.standardizedFileURL) }
+            .map { app in
+                WindowItem(id: "launch-\(app.url.path)", title: app.name, ownerName: "Application",
+                           pid: 0, isTab: false, icon: app.icon, isLaunchable: true, bundleURL: app.url)
+            }
     }
 
     /// Order windows by MRU (most-recent first); items without a tracked window (browser tabs,

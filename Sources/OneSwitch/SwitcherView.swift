@@ -8,7 +8,7 @@ struct SwitcherView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TextField("Search windows & tabs…", text: $model.query)
+            TextField("Search windows, tabs & apps…", text: $model.query)
                 .textFieldStyle(.plain)
                 .font(.system(size: 18))
                 .padding(14)

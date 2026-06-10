@@ -32,9 +32,11 @@ if CommandLine.arguments.contains("--dump") {
     let trusted = wm.ensureAccessibilityPermission()
     let tabs = wm.getBrowserTabs()
     let windows = wm.getAccessibilityWindows()
-    FileHandle.standardError.write("accessibility trusted: \(trusted), chrome tabs: \(tabs.count), windows: \(windows.count)\n".data(using: .utf8)!)
+    let apps = AppCatalog().apps()
+    FileHandle.standardError.write("accessibility trusted: \(trusted), chrome tabs: \(tabs.count), windows: \(windows.count), installed apps: \(apps.count)\n".data(using: .utf8)!)
     for t in tabs { FileHandle.standardError.write("  TAB\(t.isActiveTab ? "*" : " ") \(t.ownerName) [win \(t.chromeWindowId ?? "?") tab \(t.chromeTabId ?? "?")]: \(t.title)\n".data(using: .utf8)!) }
     for w in windows { FileHandle.standardError.write("  WIN \(w.ownerName): \(w.title)\n".data(using: .utf8)!) }
+    for a in apps.prefix(10) { FileHandle.standardError.write("  APP \(a.name): \(a.url.path)\n".data(using: .utf8)!) }
     exit(0)
 }
 

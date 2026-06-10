@@ -1,15 +1,19 @@
 # OneSwitch
 
-A lightweight macOS app/window/tab switcher triggered by **Control+Tab**. Press the
-hotkey to open a Spotlight-style popup, type to filter, navigate with the keyboard, and
-press Enter to switch. Press Control+Tab again to dismiss it. The list is sorted
-most-recently-used first.
+A lightweight macOS app/window/tab switcher **and launcher** triggered by **Control+Tab**.
+Press the hotkey to open a Spotlight-style popup, type to filter, navigate with the
+keyboard, and press Enter to go there — switching to the window or tab, or, for an app
+that isn't running, launching it. Press Control+Tab again to dismiss it. The list is
+sorted most-recently-used first.
 
 It lists:
 
 - **Google Chrome tabs** individually, with per-page favicons (via pid-addressed Apple
   Events — see Diagnostics for why not AppleScript)
 - **Every app's windows** individually, with titles and app icons (via the Accessibility API)
+- **Installed apps** (`/Applications`, `~/Applications`, `/System/Applications`) that are
+  not running — they appear only while searching, ranked below open windows/tabs, and
+  Enter launches them
 
 Runs as a background accessory app: no Dock icon, just a menu bar item.
 
@@ -20,6 +24,8 @@ Runs as a background accessory app: no Dock icon, just a menu bar item.
 - **Orderless fuzzy search** — type space-separated tokens in any order; every token must
   appear in the title or app name. Results are ranked (title matches, prefix/word-boundary
   matches, and shorter titles score higher).
+- **App launcher** — Enter on an installed-but-not-running app launches it, so "switch to
+  an app" works whether or not it is already open. One key, one meaning: take me there.
 - **Real icons** — app icons for windows, page favicons for Chrome tabs. Favicons are
   keyed by host, fetched from DuckDuckGo's favicon service with a fallback to the site's
   own `/favicon.ico` (covers intranet/private hosts), and cached two-tier (in-memory +
@@ -36,7 +42,7 @@ Runs as a background accessory app: no Dock icon, just a menu bar item.
 | **Tab** / **Shift+Tab** | Move selection down / up |
 | **↓ / ↑** | Move selection down / up |
 | **Ctrl+N / Ctrl+P** | Move selection down / up |
-| **Return** | Switch to the selected window or tab |
+| **Return** | Switch to the selected window or tab; launch the selected app if not running |
 | **Esc** | Dismiss |
 | Click a row | Switch to it |
 
@@ -89,6 +95,8 @@ Grant once; the signed identity keeps them valid across rebuilds.
   list windows/tabs, read or set the active tab, raise a window (2s timeout per event).
 - `AppLog` — timestamped diagnostics to `~/Library/Logs/OneSwitch.log` (the app runs
   headless, so stderr alone would be lost).
+- `AppCatalog` — scans the application directories for launchable .app bundles (cached,
+  rescanned when a directory's mtime changes).
 - `WindowHistory` — tracks most-recently-used windows by `CGWindowID` (via app-activation
   notifications + explicit recording) so the list can sort by recency.
 - `FaviconCache` — two-tier (memory + disk) favicon cache, resolved off the main thread.

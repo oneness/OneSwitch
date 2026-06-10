@@ -22,6 +22,10 @@ struct WindowItem {
     var pageURL: URL? = nil
     /// For browser tabs: whether this was the window's active tab when listed.
     var isActiveTab: Bool = false
+    /// Installed-but-not-running app: activating launches it instead of switching.
+    var isLaunchable: Bool = false
+    /// For launchable apps: the .app bundle to open.
+    var bundleURL: URL? = nil
 }
 
 class WindowManager {
@@ -129,6 +133,17 @@ class WindowManager {
 
     /// Action handler to switch, focus, or execute actions on selected items.
     func activate(item: WindowItem) {
+        if item.isLaunchable, let url = item.bundleURL {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+            NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, error in
+                if let error {
+                    AppLog.log("launch \(url.lastPathComponent): \(error.localizedDescription)")
+                }
+            }
+            return
+        }
+
         if item.isTab, let tabId = item.chromeTabId {
             focusChromeTab(tabId: tabId, windowId: item.chromeWindowId)
             // Bring Chrome itself forward; OneSwitch is frontmost here, so it may hand

@@ -6,6 +6,8 @@ final class SwitcherModel: ObservableObject {
         didSet { selectedIndex = 0 }
     }
     @Published private(set) var items: [WindowItem] = []
+    /// Installed-but-not-running apps; they join the pool only while searching.
+    @Published private(set) var launchables: [WindowItem] = []
     @Published var selectedIndex: Int = 0
 
     var onActivate: ((WindowItem) -> Void)?
@@ -16,7 +18,7 @@ final class SwitcherModel: ObservableObject {
         guard !tokens.isEmpty else { return items }
 
         // Orderless: every token must appear (as a substring) somewhere in title+app, any order.
-        return items.compactMap { item -> (item: WindowItem, score: Double)? in
+        return (items + launchables).compactMap { item -> (item: WindowItem, score: Double)? in
             let haystack = (item.title + " " + item.ownerName).lowercased()
             guard tokens.allSatisfy({ haystack.contains($0) }) else { return nil }
             return (item, Self.score(item: item, tokens: tokens))
@@ -51,11 +53,13 @@ final class SwitcherModel: ObservableObject {
             }
         }
         total -= Double(title.count) * 0.05                   // prefer shorter / more specific titles
+        if item.isLaunchable { total -= 1000 }                // launchables rank below any open window/tab
         return total
     }
 
-    func setItems(_ newItems: [WindowItem]) {
+    func setItems(_ newItems: [WindowItem], launchables newLaunchables: [WindowItem] = []) {
         items = newItems
+        launchables = newLaunchables
         query = ""
         selectedIndex = 0
     }
