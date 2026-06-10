@@ -16,6 +16,8 @@ struct WindowItem {
     var chromeWindowId: String? = nil
     /// Reference to a specific window (via the Accessibility API) so we can raise exactly it.
     var axWindow: AXUIElement? = nil
+    /// For Firefox tabs: the tab's AX element; AXPress on it switches the window to that tab.
+    var axTabElement: AXUIElement? = nil
     /// The owning app's icon, shown in the switcher row.
     var icon: NSImage? = nil
     /// For browser tabs: the page URL, used to resolve the tab's favicon (loaded lazily).
@@ -30,11 +32,17 @@ struct WindowItem {
 
 class WindowManager {
 
-    /// Combined list shown in the switcher: Chrome tabs (most granular) on top,
+    /// Combined list shown in the switcher: browser tabs (most granular) on top,
     /// then every app's individual windows via the Accessibility API.
     func allItems() -> [WindowItem] {
         var items = getBrowserTabs()
-        items.append(contentsOf: getAccessibilityWindows())
+        let firefoxTabs = getFirefoxTabs()
+        items.append(contentsOf: firefoxTabs)
+        // Firefox windows stay in the generic list only if tab enumeration found nothing
+        // (e.g. a Firefox UI change) — never lose the windows entirely.
+        var excluded: Set<String> = ["Google Chrome"]
+        if !firefoxTabs.isEmpty { excluded.insert("Firefox") }
+        items.append(contentsOf: getAccessibilityWindows(excluding: excluded))
         return items
     }
 
@@ -46,9 +54,9 @@ class WindowManager {
     }
 
     /// Per-window list across all regular apps via the Accessibility API. Window titles work
-    /// without Screen Recording. Chrome is excluded here because its tabs are listed separately.
+    /// without Screen Recording. Browsers whose tabs are listed separately are excluded.
     /// Apps that expose no windows fall back to a single app-level entry so they stay switchable.
-    func getAccessibilityWindows() -> [WindowItem] {
+    func getAccessibilityWindows(excluding excludedApps: Set<String> = ["Google Chrome"]) -> [WindowItem] {
         var items = [WindowItem]()
         let myPid = ProcessInfo.processInfo.processIdentifier
 
@@ -56,7 +64,7 @@ class WindowManager {
             guard app.activationPolicy == .regular,
                   let name = app.localizedName,
                   app.processIdentifier != myPid,
-                  name != "Google Chrome" else { continue }
+                  !excludedApps.contains(name) else { continue }
 
             let appElement = AXUIElementCreateApplication(app.processIdentifier)
             var value: CFTypeRef?
@@ -131,6 +139,61 @@ class WindowManager {
         return items
     }
 
+    /// Firefox tabs via the Accessibility API. Firefox has no per-tab scripting interface,
+    /// but it exposes each tab as an AXRadioButton with subrole AXTabButton (title = tab
+    /// title, AXSelected = active, AXPress switches to it) in the tab-strip toolbar.
+    /// No URLs in the AX tree, so rows carry the Firefox icon instead of favicons.
+    func getFirefoxTabs() -> [WindowItem] {
+        guard let firefox = NSWorkspace.shared.runningApplications
+            .first(where: { $0.activationPolicy == .regular && $0.localizedName == "Firefox" }) else { return [] }
+
+        let appElement = AXUIElementCreateApplication(firefox.processIdentifier)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &value) == .success,
+              let windows = value as? [AXUIElement] else { return [] }
+
+        var items = [WindowItem]()
+        for (windowIndex, window) in windows.enumerated() {
+            var tabButtons = [AXUIElement]()
+            collectTabButtons(in: window, depth: 0, into: &tabButtons)
+            for (tabIndex, tab) in tabButtons.enumerated() {
+                var titleValue: CFTypeRef?
+                AXUIElementCopyAttributeValue(tab, kAXTitleAttribute as CFString, &titleValue)
+                guard let title = titleValue as? String, !title.isEmpty else { continue }
+                var selectedValue: CFTypeRef?
+                AXUIElementCopyAttributeValue(tab, "AXSelected" as CFString, &selectedValue)
+                items.append(WindowItem(id: "fftab-\(windowIndex)-\(tabIndex)", title: title,
+                                        ownerName: "Firefox", pid: firefox.processIdentifier,
+                                        isTab: true, axWindow: window, axTabElement: tab,
+                                        icon: firefox.icon,
+                                        isActiveTab: (selectedValue as? Bool) == true))
+            }
+        }
+        return items
+    }
+
+    /// Bounded search for tab buttons: the tab strip sits a few levels under the window
+    /// (toolbar → tab group → buttons). Skips web content and menus, which are huge.
+    private func collectTabButtons(in element: AXUIElement, depth: Int, into result: inout [AXUIElement]) {
+        guard depth < 6 else { return }
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &value) == .success,
+              let children = value as? [AXUIElement] else { return }
+        for child in children {
+            var roleValue: CFTypeRef?
+            AXUIElementCopyAttributeValue(child, kAXRoleAttribute as CFString, &roleValue)
+            let role = (roleValue as? String) ?? ""
+            if role == "AXWebArea" || role == "AXMenuBar" || role == "AXMenu" { continue }
+            var subroleValue: CFTypeRef?
+            AXUIElementCopyAttributeValue(child, kAXSubroleAttribute as CFString, &subroleValue)
+            if (subroleValue as? String) == "AXTabButton" {
+                result.append(child)
+                continue                       // tab buttons have no tab-button children
+            }
+            collectTabButtons(in: child, depth: depth + 1, into: &result)
+        }
+    }
+
     /// Action handler to switch, focus, or execute actions on selected items.
     func activate(item: WindowItem) {
         if item.isLaunchable, let url = item.bundleURL {
@@ -150,6 +213,11 @@ class WindowManager {
             // focus over — same call the window path uses.
             NSRunningApplication(processIdentifier: item.pid)?.activate(options: [.activateIgnoringOtherApps])
             return
+        }
+
+        // Firefox tab: press its AX tab button, then fall through to raise the window.
+        if let tabElement = item.axTabElement {
+            AXUIElementPerformAction(tabElement, kAXPressAction as CFString)
         }
 
         // Raise the specific window if we have an AX reference, then bring its app forward.

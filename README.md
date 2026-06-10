@@ -10,6 +10,8 @@ It lists:
 
 - **Google Chrome tabs** individually, with per-page favicons (via pid-addressed Apple
   Events — see Diagnostics for why not AppleScript)
+- **Firefox tabs** individually (via the Accessibility API: each tab is an `AXTabButton`;
+  pressing it switches. No URLs in the AX tree, so rows show the Firefox icon, not favicons)
 - **Every app's windows** individually, with titles and app icons (via the Accessibility API)
 - **Installed apps** (`/Applications`, `~/Applications`, `/System/Applications`) that are
   not running — they appear only while searching, ranked below open windows/tabs, and
@@ -88,9 +90,9 @@ Grant once; the signed identity keeps them valid across rebuilds.
 
 ## Architecture
 
-- `WindowManager` — enumerates Chrome tabs (via `ChromeScripting`) + app windows
-  (Accessibility API), picks the user's real Chrome among multiple instances, and
-  activates a selected item.
+- `WindowManager` — enumerates Chrome tabs (via `ChromeScripting`), Firefox tabs
+  (Accessibility API tab buttons), and app windows (Accessibility API); picks the user's
+  real Chrome among multiple instances, and activates a selected item.
 - `ChromeScripting` — pid-addressed raw Apple Events to one specific Chrome process:
   list windows/tabs, read or set the active tab, raise a window (2s timeout per event).
 - `AppLog` — timestamped diagnostics to `~/Library/Logs/OneSwitch.log` (the app runs
@@ -110,9 +112,10 @@ Grant once; the signed identity keeps them valid across rebuilds.
 
 - **Control+Tab is grabbed globally**, so it no longer switches tabs inside apps that use
   it (browsers, terminals). The hotkey is not configurable.
-- **Firefox** exposes no per-tab scripting; its windows are listed via the Accessibility
-  API instead (so no tab-level switching for Firefox).
-- Only **Chrome** has tab-level support so far (Safari/Arc not yet implemented).
+- **Firefox tabs** come from the AX tree, which exposes no URLs — so no per-tab favicons,
+  and a Firefox UI overhaul could require adjusting the lookup (if that happens, Firefox
+  windows transparently fall back to one-row-per-window).
+- Tab-level support covers **Chrome and Firefox** (Safari/Arc not yet implemented).
 - Switching between two windows of the *same* app (without changing apps) fires no activation
   notification, so intra-app recency can lag until the switcher is next opened.
 
@@ -124,8 +127,10 @@ when Chrome tabs go missing from the switcher. `--dump` marks each window's acti
 tab with `*`.
 
 ```sh
-.build/debug/OneSwitch --dump            # print the tab/window list and permission status
-.build/debug/OneSwitch --focus-tab <id>  # focus a Chrome tab by id (ids shown by --dump)
+.build/debug/OneSwitch --dump              # print the item list as the switcher sees it
+.build/debug/OneSwitch --focus-tab <id>    # focus a Chrome tab by id (ids shown by --dump)
+.build/debug/OneSwitch --focus-fftab <id>  # press a Firefox tab button (e.g. fftab-0-1)
+.build/debug/OneSwitch --ax-dump <App>     # print an app's AX tree (web content pruned)
 ```
 
 Chrome queries are sent as **pid-addressed raw Apple Events** (`ChromeScripting`), not
