@@ -61,17 +61,7 @@ struct SwitcherView: View {
     private var commandView: some View {
         switch runner.state {
         case .idle:
-            VStack(spacing: 6) {
-                Spacer()
-                Text("↩ runs in bash")
-                    .foregroundStyle(.secondary)
-                Text("Output is shown here and copied to the clipboard. Esc cancels a running command.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                Spacer()
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 24)
+            commandHistoryView
 
         case .running(let command):
             VStack(spacing: 10) {
@@ -117,6 +107,59 @@ struct SwitcherView: View {
     }
 
     @ViewBuilder
+    private var commandHistoryView: some View {
+        let suggestions = model.commandSuggestions
+        if suggestions.isEmpty {
+            VStack(spacing: 6) {
+                Spacer()
+                Text("Ctrl+J runs typed command")
+                    .foregroundStyle(.secondary)
+                Text("History appears here when shell history has matching commands.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 24)
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text((model.commandInput ?? "").isEmpty ? "Recent shell history" : "Matching shell history")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("Return selected · Ctrl+J typed")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                Divider()
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(suggestions.enumerated()), id: \.offset) { idx, command in
+                                commandRow(command, selected: idx == model.selectedIndex)
+                                    .id(idx)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        model.selectedIndex = idx
+                                        model.runCommand(command)
+                                    }
+                            }
+                        }
+                    }
+                    .onChange(of: model.selectedIndex) { newValue in
+                        withAnimation(.easeOut(duration: 0.1)) {
+                            proxy.scrollTo(newValue, anchor: .center)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
     private func row(_ item: WindowItem, selected: Bool) -> some View {
         HStack(spacing: 10) {
             Group {
@@ -142,6 +185,22 @@ struct SwitcherView: View {
                     .font(.caption)
                     .foregroundStyle(selected ? Color.white.opacity(0.8) : Color.secondary)
             }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(selected ? Color.accentColor.opacity(0.85) : Color.clear)
+    }
+
+    private func commandRow(_ command: String, selected: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "clock.arrow.circlepath")
+                .foregroundStyle(selected ? Color.white.opacity(0.9) : Color.secondary)
+                .frame(width: 22, height: 22)
+            Text(command)
+                .font(.system(.body, design: .monospaced))
+                .lineLimit(1)
+                .foregroundStyle(selected ? Color.white : Color.primary)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 14)

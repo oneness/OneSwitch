@@ -3,15 +3,21 @@ import SwiftUI
 /// Observable state backing the switcher popup.
 final class SwitcherModel: ObservableObject {
     @Published var query: String = "" {
-        didSet { selectedIndex = 0 }
+        didSet {
+            selectedIndex = 0
+            onQueryChanged?()
+        }
     }
     @Published private(set) var items: [WindowItem] = []
     /// Installed-but-not-running apps; they join the pool only while searching.
     @Published private(set) var launchables: [WindowItem] = []
+    @Published private(set) var commandHistory: [String] = []
     @Published var selectedIndex: Int = 0
 
     var onActivate: ((WindowItem) -> Void)?
     var onDismiss: (() -> Void)?
+    var onRunCommand: ((String) -> Void)?
+    var onQueryChanged: (() -> Void)?
 
     /// Command mode: a query starting with ">" is a shell command, not a search.
     var commandInput: String? {
@@ -19,7 +25,19 @@ final class SwitcherModel: ObservableObject {
         return String(query.dropFirst()).trimmingCharacters(in: .whitespaces)
     }
 
+    var commandSuggestions: [String] {
+        guard let commandInput else { return [] }
+        let tokens = commandInput.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        let matching = commandHistory.filter { command in
+            guard !tokens.isEmpty else { return true }
+            let lowercased = command.lowercased()
+            return tokens.allSatisfy { lowercased.contains($0) }
+        }
+        return Array(matching.prefix(80))
+    }
+
     var filtered: [WindowItem] {
+        guard commandInput == nil else { return [] }
         let tokens = query.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)
         guard !tokens.isEmpty else { return items }
 
@@ -70,10 +88,20 @@ final class SwitcherModel: ObservableObject {
         selectedIndex = 0
     }
 
+    func setCommandHistory(_ commands: [String]) {
+        commandHistory = commands
+        selectedIndex = min(selectedIndex, max(0, currentSelectionCount - 1))
+    }
+
     /// Replace the item pool while the panel is open, preserving the query and keeping the
     /// selection on the same item where possible (used by the post-open refresh that picks
     /// up late-arriving AX data, e.g. a freshly launched Firefox's tabs).
     func refreshItems(_ newItems: [WindowItem], launchables newLaunchables: [WindowItem]) {
+        if commandInput != nil {
+            items = newItems
+            launchables = newLaunchables
+            return
+        }
         let selectedId = filtered.indices.contains(selectedIndex) ? filtered[selectedIndex].id : nil
         items = newItems
         launchables = newLaunchables
@@ -85,7 +113,7 @@ final class SwitcherModel: ObservableObject {
     }
 
     func moveSelection(_ delta: Int) {
-        let count = filtered.count
+        let count = currentSelectionCount
         guard count > 0 else { return }
         selectedIndex = (selectedIndex + delta + count) % count
     }
@@ -98,5 +126,43 @@ final class SwitcherModel: ObservableObject {
 
     func dismiss() {
         onDismiss?()
+    }
+
+    func runSelectedCommand() {
+        if let selected = selectedCommandSuggestion {
+            runCommand(selected)
+        } else if let commandInput {
+            runCommand(commandInput)
+        }
+    }
+
+    func runTypedCommand() {
+        guard let commandInput else { return }
+        runCommand(commandInput)
+    }
+
+    func runCommand(_ command: String) {
+        let command = command.trimmingCharacters(in: .whitespaces)
+        guard !command.isEmpty else { return }
+        rememberCommand(command)
+        onRunCommand?(command)
+    }
+
+    private var selectedCommandSuggestion: String? {
+        let suggestions = commandSuggestions
+        guard suggestions.indices.contains(selectedIndex) else { return nil }
+        return suggestions[selectedIndex]
+    }
+
+    private var currentSelectionCount: Int {
+        commandInput == nil ? filtered.count : commandSuggestions.count
+    }
+
+    private func rememberCommand(_ command: String) {
+        commandHistory.removeAll { $0 == command }
+        commandHistory.insert(command, at: 0)
+        if commandHistory.count > 200 {
+            commandHistory.removeLast(commandHistory.count - 200)
+        }
     }
 }

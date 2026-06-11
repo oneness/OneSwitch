@@ -70,4 +70,8 @@ final class CommandRunner: ObservableObject {
         cancel()
         state = .idle
     }
+
+    func clearFinished() {
+        if case .finished = state { state = .idle }
+    }
 }

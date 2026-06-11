@@ -23,6 +23,8 @@ final class SwitcherPanelController {
         self.model = SwitcherModel()
         model.onActivate = { [weak self] item in self?.activate(item) }
         model.onDismiss = { [weak self] in self?.hide() }
+        model.onRunCommand = { [weak self] command in self?.commandRunner.run(command) }
+        model.onQueryChanged = { [weak self] in self?.commandRunner.clearFinished() }
     }
 
     /// Control+Tab toggles the switcher open/closed; plain Tab cycles the selection.
@@ -34,6 +36,7 @@ final class SwitcherPanelController {
         history.captureFront()                              // keep recency current
         let items = orderedByRecency(windowManager.allItems())
         model.setItems(items, launchables: launchableApps())
+        model.setCommandHistory(ShellHistory.recentCommands())
         model.selectedIndex = previousWindowIndex(in: items)  // Enter alone toggles back
 
         let panel = self.panel ?? makePanel()
@@ -144,9 +147,12 @@ final class SwitcherPanelController {
             case 126: self.model.moveSelection(-1); return nil   // up arrow
             case 45 where ctrl: self.model.moveSelection(1); return nil   // Ctrl+N -> next
             case 35 where ctrl: self.model.moveSelection(-1); return nil  // Ctrl+P -> previous
+            case 38 where ctrl:                                  // Ctrl+J -> run typed command
+                if self.model.commandInput != nil { self.model.runTypedCommand(); return nil }
+                return event
             case 36, 76:                                         // return / keypad enter
-                if let command = self.model.commandInput {       // "> cmd" runs instead of switching
-                    if !command.isEmpty { self.commandRunner.run(command) }
+                if self.model.commandInput != nil {              // "> cmd" runs selected history
+                    self.model.runSelectedCommand()
                 } else {
                     self.model.activateSelection()
                 }
