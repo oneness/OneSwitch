@@ -23,6 +23,10 @@ Runs as a background accessory app: no Dock icon, just a menu bar item.
 
 - **Recency-sorted** — windows ordered most-recently-used first (tracked via the
   Accessibility API + app-activation notifications).
+- **Instant toggle** — the switcher opens with the *previous* window already highlighted
+  (skipping other rows of the current window, e.g. its own tabs), so Control+Tab, Enter
+  bounces between your two most recent windows. Chrome windows participate via their
+  active-tab row.
 - **Orderless fuzzy search** — type space-separated tokens in any order; every token must
   appear in the title or app name. Results are ranked (title matches, prefix/word-boundary
   matches, and shorter titles score higher).
@@ -40,7 +44,7 @@ Runs as a background accessory app: no Dock icon, just a menu bar item.
 
 | Key | Action |
 | --- | --- |
-| **Control+Tab** | Open the switcher; press again to dismiss |
+| **Control+Tab** | Open the switcher (previous window preselected); press again to dismiss |
 | **Tab** / **Shift+Tab** | Move selection down / up |
 | **↓ / ↑** | Move selection down / up |
 | **Ctrl+N / Ctrl+P** | Move selection down / up |
@@ -100,7 +104,8 @@ Grant once; the signed identity keeps them valid across rebuilds.
 - `AppCatalog` — scans the application directories for launchable .app bundles (cached,
   rescanned when a directory's mtime changes).
 - `WindowHistory` — tracks most-recently-used windows by `CGWindowID` (via app-activation
-  notifications + explicit recording) so the list can sort by recency.
+  notifications + explicit recording) so the list can sort by recency and the switcher can
+  preselect the previous window for the Enter toggle.
 - `FaviconCache` — two-tier (memory + disk) favicon cache, resolved off the main thread.
 - `HotKeyManager` — registers the global Control+Tab hotkey (Carbon).
 - `SwitcherPanelController` / `SwitcherView` / `SwitcherModel` — the popup panel, its SwiftUI

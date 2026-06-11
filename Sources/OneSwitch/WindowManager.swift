@@ -111,6 +111,14 @@ class WindowManager {
         guard let chrome = realChrome() else { return [] }
         let scripting = ChromeScripting(pid: chrome.processIdentifier)
 
+        // Chrome's AX windows, so each window's active tab can carry the window reference.
+        // That ties the tab into window recency (MRU ordering + previous-window
+        // preselection); matched by title since AE window ids and AX elements don't link.
+        var axValue: CFTypeRef?
+        AXUIElementCopyAttributeValue(AXUIElementCreateApplication(chrome.processIdentifier),
+                                      kAXWindowsAttribute as CFString, &axValue)
+        var unmatchedAXWindows = (axValue as? [AXUIElement]) ?? []
+
         var items = [WindowItem]()
         do {
             for windowId in try scripting.windowIds() {
@@ -126,10 +134,15 @@ class WindowManager {
                     if let scheme = pageURL?.scheme?.lowercased(), !["http", "https"].contains(scheme) {
                         pageURL = nil
                     }
+                    var axWindow: AXUIElement?
+                    if activeIndex == i + 1,
+                       let match = unmatchedAXWindows.firstIndex(where: { axWindowTitle($0).hasPrefix(title) }) {
+                        axWindow = unmatchedAXWindows.remove(at: match)
+                    }
                     items.append(WindowItem(id: "tab-\(ids[i])", title: title, ownerName: "Chrome",
                                             pid: chrome.processIdentifier, isTab: true,
                                             chromeTabId: ids[i], chromeWindowId: windowId,
-                                            icon: chrome.icon, pageURL: pageURL,
+                                            axWindow: axWindow, icon: chrome.icon, pageURL: pageURL,
                                             isActiveTab: activeIndex == i + 1))
                 }
             }
@@ -190,6 +203,12 @@ class WindowManager {
             AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
         }
         return items
+    }
+
+    private func axWindowTitle(_ window: AXUIElement) -> String {
+        var value: CFTypeRef?
+        AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &value)
+        return (value as? String) ?? ""
     }
 
     /// Bounded search for tab buttons: the tab strip sits a few levels under the window

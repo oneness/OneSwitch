@@ -61,6 +61,11 @@ final class WindowHistory {
         return order.firstIndex(of: id) ?? Int.max
     }
 
+    /// Stable window identity for an item's AX reference (nil if untracked).
+    func id(of element: AXUIElement?) -> CGWindowID? {
+        element.flatMap { windowID(of: $0) }
+    }
+
     private func windowID(of element: AXUIElement) -> CGWindowID? {
         var id = CGWindowID(0)
         return _AXUIElementGetWindow(element, &id) == .success && id != 0 ? id : nil

@@ -32,7 +32,8 @@ final class SwitcherPanelController {
     private func show() {
         history.captureFront()                              // keep recency current
         let items = orderedByRecency(windowManager.allItems())
-        model.setItems(items, launchables: launchableApps())  // selection starts at the top
+        model.setItems(items, launchables: launchableApps())
+        model.selectedIndex = previousWindowIndex(in: items)  // Enter alone toggles back
 
         let panel = self.panel ?? makePanel()
         self.panel = panel
@@ -69,6 +70,21 @@ final class SwitcherPanelController {
         if let window = item.axWindow { history.record(window) }
         hide()
         windowManager.activate(item: item)
+    }
+
+    /// Classic Cmd+Tab-style toggle: open with the *previous* window highlighted, so a bare
+    /// Enter bounces between the two most recent windows (the MRU stack swaps on each
+    /// activation, which restores "current" to the second slot automatically). The list is
+    /// recency-sorted, so the target is the first item not belonging to the front window —
+    /// rows of the front window itself (e.g. its own tabs) are skipped.
+    private func previousWindowIndex(in items: [WindowItem]) -> Int {
+        guard items.count > 1 else { return 0 }
+        guard let frontId = history.order.first else { return 1 }
+        for (index, item) in items.enumerated() {
+            if let id = history.id(of: item.axWindow), id == frontId { continue }
+            return index
+        }
+        return 0
     }
 
     /// Installed apps that are not running, as launch-on-Enter items. Running apps are
