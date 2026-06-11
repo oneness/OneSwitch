@@ -1,6 +1,7 @@
 # OneSwitch
 
-A lightweight macOS app/window/tab switcher **and launcher** triggered by **Control+Tab**.
+A lightweight macOS app/window/tab switcher **and launcher** triggered by **Control+Tab**
+(configurable from the menu bar).
 Press the hotkey to open a Spotlight-style popup, type to filter, navigate with the
 keyboard, and press Enter to go there — switching to the window or tab, or, for an app
 that isn't running, launching it. Press Control+Tab again to dismiss it. The list is
@@ -37,8 +38,9 @@ Runs as a background accessory app: no Dock icon, just a menu bar item.
   own `/favicon.ico` (covers intranet/private hosts), and cached two-tier (in-memory +
   on-disk under `~/Library/Caches`), so they survive relaunches with no re-fetch.
   Non-web tabs (`chrome://…`) show the Chrome icon.
-- **Menu bar item** — toggle **Launch at Login** and quit from the status bar (the app has no
-  Dock icon, so this is also the only quit affordance).
+- **Menu bar item** — change the hotkey (a recorder panel captures the next combo you
+  press), toggle **Launch at Login**, and quit from the status bar (the app has no Dock
+  icon, so this is also the only quit affordance). The hotkey persists in UserDefaults.
 
 ### Keys
 
@@ -115,8 +117,10 @@ Grant once; the signed identity keeps them valid across rebuilds.
 
 ## Known limitations
 
-- **Control+Tab is grabbed globally**, so it no longer switches tabs inside apps that use
-  it (browsers, terminals). The hotkey is not configurable.
+- **The hotkey is grabbed globally**, so the chosen combo no longer reaches apps that use
+  it themselves (e.g. Control+Tab switches tabs in browsers and terminals). Pick a combo
+  you don't need elsewhere; modifier-only combos (like double-tap Ctrl) aren't possible
+  with the Carbon hotkey API.
 - **Firefox tabs** come from the AX tree, which exposes no URLs — so no per-tab favicons,
   and a Firefox UI overhaul could require adjusting the lookup (if that happens, Firefox
   windows transparently fall back to one-row-per-window).

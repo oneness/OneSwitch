@@ -9,12 +9,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBar: StatusBarController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        statusBar = StatusBarController()
         switcher = SwitcherPanelController(windowManager: windowManager, history: windowHistory)
         hotKeyManager = HotKeyManager { [weak self] in
             self?.switcher.handleHotkey()
         }
         hotKeyManager.register()
+        statusBar = StatusBarController(hotKeyManager: hotKeyManager)
 
         let trusted = windowManager.ensureAccessibilityPermission()
 
@@ -34,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Launch diagnostic: when launched via `open`, stderr is detached, so AppLog also
         // records this to ~/Library/Logs/OneSwitch.log.
         let windows = windowManager.getAccessibilityWindows()
-        AppLog.log("launched: accessibility trusted: \(trusted), windows: \(windows.count). Press Control+Tab to open the switcher.")
+        AppLog.log("launched: accessibility trusted: \(trusted), windows: \(windows.count). Press \(hotKeyManager.hotKey.display) to open the switcher.")
         if !trusted {
             AppLog.log("Accessibility permission NOT granted — per-window listing will be limited. Grant it in System Settings ▸ Privacy & Security ▸ Accessibility, then relaunch.")
         }

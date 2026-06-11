@@ -22,22 +22,30 @@ enum LoginItem {
     }
 }
 
-/// Menu bar presence: a status item with a "Launch at Login" toggle and Quit.
-/// Also the app's only quit affordance (it has no Dock icon).
+/// Menu bar presence: a status item with hotkey configuration, a "Launch at Login"
+/// toggle, and Quit. Also the app's only quit affordance (it has no Dock icon).
 final class StatusBarController: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let loginItem = NSMenuItem(title: "Launch at Login", action: nil, keyEquivalent: "")
+    private let hotkeyItem = NSMenuItem(title: "Change Hotkey…", action: nil, keyEquivalent: "")
+    private let hotKeyManager: HotKeyManager
+    private let recorder = HotKeyRecorder()
 
-    override init() {
+    init(hotKeyManager: HotKeyManager) {
+        self.hotKeyManager = hotKeyManager
         super.init()
 
         if let button = statusItem.button {
             button.image = Self.makeStatusImage()
-            button.toolTip = "OneSwitch — press Control+Tab to switch"
+            button.toolTip = "OneSwitch — press \(hotKeyManager.hotKey.display) to switch"
         }
 
         let menu = NSMenu()
         menu.delegate = self
+
+        hotkeyItem.target = self
+        hotkeyItem.action = #selector(changeHotkey)
+        menu.addItem(hotkeyItem)
 
         loginItem.target = self
         loginItem.action = #selector(toggleLogin)
@@ -52,13 +60,29 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         statusItem.menu = menu
     }
 
-    // Refresh the checkmark to reflect the real system state each time the menu opens.
+    // Refresh the checkmark and hotkey label to reflect real state each time the menu opens.
     func menuWillOpen(_ menu: NSMenu) {
         loginItem.state = LoginItem.isEnabled ? .on : .off
+        hotkeyItem.title = "Change Hotkey (\(hotKeyManager.hotKey.display))…"
     }
 
     @objc private func toggleLogin() {
         LoginItem.set(!LoginItem.isEnabled)
+    }
+
+    /// Suspend the current hotkey while recording (so the same combo can be re-recorded),
+    /// then apply the captured combo — or restore the old one on cancel.
+    @objc private func changeHotkey() {
+        hotKeyManager.unregister()
+        recorder.begin(currentDisplay: hotKeyManager.hotKey.display) { [weak self] captured in
+            guard let self else { return }
+            if let captured {
+                self.hotKeyManager.apply(captured)
+            } else {
+                self.hotKeyManager.register()
+            }
+            self.statusItem.button?.toolTip = "OneSwitch — press \(self.hotKeyManager.hotKey.display) to switch"
+        }
     }
 
     @objc private func quit() {
