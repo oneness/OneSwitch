@@ -84,6 +84,20 @@ if let flagIndex = CommandLine.arguments.firstIndex(of: "--focus-fftab"),
     exit(0)
 }
 
+// Diagnostic mode: run a shell command through CommandRunner (command mode's engine),
+// print the result, then exit. Note: replaces the clipboard, like command mode does.
+if let flagIndex = CommandLine.arguments.firstIndex(of: "--run-cmd"),
+   CommandLine.arguments.count > flagIndex + 1 {
+    let runner = CommandRunner()
+    runner.run(CommandLine.arguments[flagIndex + 1])
+    while runner.isRunning { RunLoop.main.run(until: Date().addingTimeInterval(0.1)) }
+    if case .finished(_, let output, let exitCode) = runner.state {
+        let clipboard = NSPasteboard.general.string(forType: .string) ?? "(nil)"
+        FileHandle.standardError.write("exit \(exitCode)\noutput: \(output)\nclipboard: \(clipboard)\n".data(using: .utf8)!)
+    }
+    exit(0)
+}
+
 // Diagnostic mode: focus a Chrome tab by id (as printed by --dump), then exit.
 if let flagIndex = CommandLine.arguments.firstIndex(of: "--focus-tab"),
    CommandLine.arguments.count > flagIndex + 1 {

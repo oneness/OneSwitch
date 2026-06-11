@@ -13,6 +13,7 @@ final class SwitcherPanelController {
     private let history: WindowHistory
     private let model: SwitcherModel
     private let appCatalog = AppCatalog()
+    private let commandRunner = CommandRunner()
     private var panel: NSPanel?
     private var keyMonitor: Any?
 
@@ -63,6 +64,7 @@ final class SwitcherPanelController {
 
     private func hide() {
         removeKeyMonitor()
+        commandRunner.reset()        // kill any command still running
         panel?.orderOut(nil)
     }
 
@@ -120,7 +122,7 @@ final class SwitcherPanelController {
             backing: .buffered,
             defer: false
         )
-        panel.contentView = NSHostingView(rootView: SwitcherView(model: model))
+        panel.contentView = NSHostingView(rootView: SwitcherView(model: model, runner: commandRunner))
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.hasShadow = true
@@ -142,8 +144,16 @@ final class SwitcherPanelController {
             case 126: self.model.moveSelection(-1); return nil   // up arrow
             case 45 where ctrl: self.model.moveSelection(1); return nil   // Ctrl+N -> next
             case 35 where ctrl: self.model.moveSelection(-1); return nil  // Ctrl+P -> previous
-            case 36, 76: self.model.activateSelection(); return nil       // return / keypad enter
-            case 53: self.model.dismiss(); return nil            // esc
+            case 36, 76:                                         // return / keypad enter
+                if let command = self.model.commandInput {       // "> cmd" runs instead of switching
+                    if !command.isEmpty { self.commandRunner.run(command) }
+                } else {
+                    self.model.activateSelection()
+                }
+                return nil
+            case 53:                                             // esc: kill a running command, else dismiss
+                if self.commandRunner.isRunning { self.commandRunner.cancel() } else { self.model.dismiss() }
+                return nil
             default: return event                                // everything else types into search
             }
         }

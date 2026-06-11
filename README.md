@@ -33,6 +33,10 @@ Runs as a background accessory app: no Dock icon, just a menu bar item.
   matches, and shorter titles score higher).
 - **App launcher** — Enter on an installed-but-not-running app launches it, so "switch to
   an app" works whether or not it is already open. One key, one meaning: take me there.
+- **Command mode** — type `>` followed by a shell command; Enter runs it (`bash -lc`, your
+  login environment, home directory). Output appears in the panel (stdout+stderr, exit
+  code shown) and is copied to the clipboard in full. Esc kills a running command. No
+  TTY, so interactive commands and sudo are out.
 - **Real icons** — app icons for windows, page favicons for Chrome tabs. Favicons are
   keyed by host, fetched from DuckDuckGo's favicon service with a fallback to the site's
   own `/favicon.ico` (covers intranet/private hosts), and cached two-tier (in-memory +
@@ -50,7 +54,7 @@ Runs as a background accessory app: no Dock icon, just a menu bar item.
 | **Tab** / **Shift+Tab** | Move selection down / up |
 | **↓ / ↑** | Move selection down / up |
 | **Ctrl+N / Ctrl+P** | Move selection down / up |
-| **Return** | Switch to the selected window or tab; launch the selected app if not running |
+| **Return** | Switch to the selected window or tab; launch the selected app if not running; run the command in `>` mode |
 | **Esc** | Dismiss |
 | Click a row | Switch to it |
 
@@ -145,6 +149,7 @@ tab with `*`.
 .build/debug/OneSwitch --focus-tab <id>    # focus a Chrome tab by id (ids shown by --dump)
 .build/debug/OneSwitch --focus-fftab <id>  # press a Firefox tab button (e.g. fftab-0-1)
 .build/debug/OneSwitch --ax-dump <App>     # print an app's AX tree (web content pruned)
+.build/debug/OneSwitch --run-cmd "<cmd>"   # exercise command mode's runner (replaces clipboard)
 ```
 
 Chrome queries are sent as **pid-addressed raw Apple Events** (`ChromeScripting`), not

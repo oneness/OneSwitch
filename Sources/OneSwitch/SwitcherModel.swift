@@ -13,6 +13,12 @@ final class SwitcherModel: ObservableObject {
     var onActivate: ((WindowItem) -> Void)?
     var onDismiss: (() -> Void)?
 
+    /// Command mode: a query starting with ">" is a shell command, not a search.
+    var commandInput: String? {
+        guard query.hasPrefix(">") else { return nil }
+        return String(query.dropFirst()).trimmingCharacters(in: .whitespaces)
+    }
+
     var filtered: [WindowItem] {
         let tokens = query.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)
         guard !tokens.isEmpty else { return items }
