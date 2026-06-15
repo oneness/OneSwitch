@@ -89,44 +89,39 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         NSApp.terminate(nil)
     }
 
-    /// Monochrome template image (auto-adapts to light/dark menu bar): the Control
-    /// chevron stacked over the Tab arrow-to-bar glyph.
+    /// Menu-bar badge: a near-black rounded-square tile with a white toggle switch in the
+    /// ON position inset inside it. Sized and styled to match the VoiceToText menu-bar
+    /// icon exactly (20pt tile, same insets / corner radius / background), so it sits at
+    /// the same visual size as other apps. Fixed colors (not a template) so the dark
+    /// background is preserved in both light and dark menu bars.
     private static func makeStatusImage() -> NSImage {
-        let image = NSImage(size: NSSize(width: 14, height: 16), flipped: false) { _ in
-            NSColor.black.setStroke()
-            let lw: CGFloat = 1.9
+        let image = NSImage(size: NSSize(width: 20, height: 20), flipped: false) { _ in
+            // Background tile (matches VoiceToText's insets / colour / corner radius).
+            let b = NSRect(x: 0, y: 0, width: 20, height: 20)
+                .insetBy(dx: 0.4, dy: 0.4).insetBy(dx: 0.45, dy: 0.45)
+            let bg = NSBezierPath(roundedRect: b, xRadius: max(3.0, b.width * 0.24), yRadius: max(3.0, b.width * 0.24))
+            NSColor(calibratedWhite: 0.06, alpha: 1.0).setFill()
+            bg.fill()
+            NSColor(calibratedWhite: 1.0, alpha: 0.10).setStroke()
+            bg.lineWidth = 0.7
+            bg.stroke()
 
-            let chevron = NSBezierPath()
-            chevron.lineWidth = lw
-            chevron.lineCapStyle = .round
-            chevron.lineJoinStyle = .round
-            chevron.move(to: NSPoint(x: 3.0, y: 9.6))
-            chevron.line(to: NSPoint(x: 7.0, y: 13.4))
-            chevron.line(to: NSPoint(x: 11.0, y: 9.6))
-            chevron.stroke()
+            // White vertical toggle (knob pushed up = ON), centered with a generous margin.
+            NSColor.white.setStroke()
+            NSColor.white.setFill()
+            let tw = b.width * 0.30, th = b.height * 0.56
+            let track = NSRect(x: b.midX - tw/2, y: b.midY - th/2, width: tw, height: th)
+            let pill = NSBezierPath(roundedRect: track, xRadius: track.width/2, yRadius: track.width/2)
+            pill.lineWidth = max(0.8, tw * 0.16)
+            pill.stroke()
 
-            let cy: CGFloat = 4.5
-            let tab = NSBezierPath()
-            tab.lineWidth = lw
-            tab.lineCapStyle = .round
-            tab.lineJoinStyle = .round
-            tab.move(to: NSPoint(x: 2.2, y: cy))
-            tab.line(to: NSPoint(x: 9.2, y: cy))
-            tab.move(to: NSPoint(x: 7.0, y: cy + 1.9))
-            tab.line(to: NSPoint(x: 9.4, y: cy))
-            tab.line(to: NSPoint(x: 7.0, y: cy - 1.9))
-            tab.stroke()
-
-            let bar = NSBezierPath()
-            bar.lineWidth = lw
-            bar.lineCapStyle = .round
-            bar.move(to: NSPoint(x: 11.4, y: cy + 2.6))
-            bar.line(to: NSPoint(x: 11.4, y: cy - 2.6))
-            bar.stroke()
+            let inset = tw * 0.18
+            let d = tw - inset*2
+            let knob = NSRect(x: track.minX + inset, y: track.maxY - inset - d, width: d, height: d)
+            NSBezierPath(ovalIn: knob).fill()
 
             return true
         }
-        image.isTemplate = true
         return image
     }
 }
