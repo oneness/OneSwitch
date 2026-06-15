@@ -4,11 +4,18 @@ import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import { SwitcherPopup } from './lib/switcher.js';
+import { OneSwitchIndicator } from './lib/indicator.js';
 
 export default class OneSwitchExtension extends Extension {
   enable() {
     this._settings = this.getSettings();
     this._popup = new SwitcherPopup();
+
+    this._indicator = new OneSwitchIndicator(
+      () => this._popup.toggle(),
+      () => this.openPreferences());
+    Main.panel.addToStatusArea('oneswitch', this._indicator);
+
     Main.wm.addKeybinding(
       'hotkey',
       this._settings,
@@ -19,6 +26,7 @@ export default class OneSwitchExtension extends Extension {
 
   disable() {
     Main.wm.removeKeybinding('hotkey');
+    if (this._indicator) { this._indicator.destroy(); this._indicator = null; }
     if (this._popup) { this._popup.destroy(); this._popup = null; }
     this._settings = null;
   }

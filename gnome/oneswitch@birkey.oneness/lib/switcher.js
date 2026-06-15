@@ -10,8 +10,11 @@ import { parseQuery } from './query.js';
 import { matchHistory } from './history.js';
 import { readHistory } from './history-io.js';
 import { CommandRunner } from './command.js';
+import Gio from 'gi://Gio';
 import * as Windows from './windows.js';
 import * as Apps from './apps.js';
+import * as Browser from './browser.js';
+import * as Favicons from './favicons.js';
 
 export const SwitcherPopup = GObject.registerClass(
 class SwitcherPopup extends St.Widget {
@@ -65,6 +68,8 @@ class SwitcherPopup extends St.Widget {
     if (this.visible) return;
     const focused = Windows.focusedWindowId();
     this._all = Windows.listWindows();
+    this._tabs = Browser.listTabs();
+    this._all = this._all.concat(this._tabs);
     this._apps = Apps.listApps(Windows.openAppIds());
     this._items = composeResults(this._all, this._apps, '');
     this._selected = preselectIndex(this._items, focused);
@@ -114,6 +119,9 @@ class SwitcherPopup extends St.Widget {
         if (icon) row.add_child(icon);
       } else if (it.kind === 'app' && it.gicon) {
         row.add_child(new St.Icon({ gicon: it.gicon, icon_size: 22 }));
+      } else if (it.kind === 'tab') {
+        const path = Favicons.cachedFaviconPath(it.url);
+        if (path) row.add_child(new St.Icon({ gicon: Gio.icon_new_for_string(path), icon_size: 22 }));
       }
       const text = new St.BoxLayout({ vertical: true });
       text.add_child(new St.Label({ style_class: 'oneswitch-row-title', text: it.title || '(untitled)' }));
@@ -159,6 +167,11 @@ class SwitcherPopup extends St.Widget {
     }
     this.close();
     if (!it) return;
+    if (it.kind === 'tab') {
+      Browser.activateTab(it);
+      Windows.raiseBrowserWindow(it.browser, it.title);
+      return;
+    }
     if (it.kind === 'app') Apps.launch(it.appInfo);
     else Windows.activate(it.metaWindow);
   }

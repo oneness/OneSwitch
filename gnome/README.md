@@ -56,3 +56,29 @@ nix develop       # provides gjs, glib-compile-schemas, gnome-shell, node, zip, 
 ## Extension UUID
 
 `oneswitch@birkey.oneness`
+
+## NixOS install (declarative)
+
+In your home-manager config:
+
+```nix
+{ inputs, ... }:
+let oneswitch = inputs.oneswitch.packages.x86_64-linux;
+in {
+  imports = [ (import ./path/to/nix/home-module.nix { inherit (oneswitch) extension host; }) ];
+}
+```
+
+Then load the WebExtension once per browser (unpacked from `gnome/webext/`), set
+`allowed_origins` in the Chrome manifest to your unpacked extension id, and log out/in
+(or restart GNOME Shell) so the extension and keybinding load. The browser
+native-messaging manifests are written automatically.
+
+## Browser tabs setup
+
+1. Chrome: `chrome://extensions` → Developer mode → Load unpacked → `gnome/webext/`
+   - Note the extension id; the Chrome native-messaging manifest will need it as `allowed_origins`.
+2. Firefox: `about:debugging` → This Firefox → Load Temporary Add-on → `gnome/webext/manifest.json`
+
+Once the WebExtension is running and the native host is installed, a socket appears at
+`$XDG_RUNTIME_DIR/oneswitch-browser-{chrome,firefox}.sock` and tabs show up in the switcher.

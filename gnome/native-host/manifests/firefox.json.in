@@ -1,0 +1,7 @@
+{
+  "name": "health.oneness.oneswitch",
+  "description": "OneSwitch tab bridge",
+  "path": "@HOST_PATH@",
+  "type": "stdio",
+  "allowed_extensions": ["oneswitch@birkey.oneness"]
+}

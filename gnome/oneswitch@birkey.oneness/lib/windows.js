@@ -32,6 +32,25 @@ export function activate(metaWindow) {
   Main.activateWindow(metaWindow);
 }
 
+// Raise the browser window for an activated tab. Best-effort: match the
+// browser app, preferring the window whose title contains the tab title.
+export function raiseBrowserWindow(browser, tabTitle) {
+  const tracker = Shell.WindowTracker.get_default();
+  const wantFirefox = browser === 'firefox';
+  let fallback = null;
+  for (const w of global.display.get_tab_list(Meta.TabList.NORMAL, null)) {
+    const app = tracker.get_window_app(w);
+    const name = (app ? app.get_name() : '').toLowerCase();
+    const isFirefox = name.includes('firefox');
+    const isChrome = name.includes('chrome') || name.includes('chromium');
+    if (wantFirefox ? isFirefox : isChrome) {
+      fallback = fallback || w;
+      if (tabTitle && (w.get_title() || '').includes(tabTitle)) { Main.activateWindow(w); return; }
+    }
+  }
+  if (fallback) Main.activateWindow(fallback);
+}
+
 // Desktop ids ("firefox.desktop") of apps that currently have a window open.
 export function openAppIds() {
   const tracker = Shell.WindowTracker.get_default();
