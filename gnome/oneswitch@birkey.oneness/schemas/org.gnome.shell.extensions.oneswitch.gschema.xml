@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.oneswitch"
+          path="/org/gnome/shell/extensions/oneswitch/">
+    <key name="hotkey" type="as">
+      <default><![CDATA[['<Control>Tab']]]></default>
+      <summary>Open/close the switcher</summary>
+      <description>Global hotkey that toggles the OneSwitch popup.</description>
+    </key>
+  </schema>
+</schemalist>

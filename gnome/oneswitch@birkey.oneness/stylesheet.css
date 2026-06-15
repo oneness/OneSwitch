@@ -1,0 +1,34 @@
+.oneswitch-popup {
+  background-color: rgba(30, 30, 32, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 14px;
+  padding: 10px;
+  width: 640px;
+}
+.oneswitch-entry {
+  font-size: 15px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+}
+.oneswitch-list { spacing: 2px; }
+.oneswitch-row {
+  padding: 7px 10px;
+  border-radius: 8px;
+  spacing: 10px;
+}
+.oneswitch-row:selected,
+.oneswitch-row.selected {
+  background-color: rgba(120, 150, 255, 0.35);
+}
+.oneswitch-row-title { font-size: 14px; }
+.oneswitch-row-sub { font-size: 11px; color: rgba(255,255,255,0.55); }
+.oneswitch-output {
+  font-family: monospace;
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background-color: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.9);
+}

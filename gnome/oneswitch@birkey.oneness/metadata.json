@@ -1,0 +1,8 @@
+{
+  "uuid": "oneswitch@birkey.oneness",
+  "name": "OneSwitch",
+  "description": "Spotlight-style window/tab switcher and launcher on a global hotkey.",
+  "shell-version": ["47"],
+  "settings-schema": "org.gnome.shell.extensions.oneswitch",
+  "url": "https://github.com/oneness/OneSwitch"
+}
