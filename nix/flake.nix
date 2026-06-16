@@ -28,6 +28,7 @@
           pname = "oneswitch-browser-host";
           version = "1.0";
           inherit src;
+          dontBuild = true;
           nativeBuildInputs = [ pkgs.makeWrapper ];
           buildInputs = [ pkgs.gjs ];
           installPhase = ''

@@ -3,7 +3,7 @@
   "name": "OneSwitch Bridge",
   "version": "1.0",
   "description": "Reports tabs to the OneSwitch GNOME extension and switches on request.",
-  "permissions": ["tabs"],
+  "permissions": ["tabs", "nativeMessaging"],
   "background": { "service_worker": "background.js", "scripts": ["background.js"] },
   "browser_specific_settings": {
     "gecko": { "id": "oneswitch@birkey.oneness" }

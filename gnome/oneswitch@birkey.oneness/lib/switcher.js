@@ -1,4 +1,5 @@
 import Clutter from 'gi://Clutter';
+import GLib from 'gi://GLib';
 import St from 'gi://St';
 import Shell from 'gi://Shell';
 import GObject from 'gi://GObject';
@@ -46,6 +47,12 @@ class SwitcherPopup extends St.Widget {
 
     this._entry = new St.Entry({ style_class: 'oneswitch-entry', can_focus: true });
     this._entry.clutter_text.connect('text-changed', () => this._refilter());
+    // Key events go to the focused clutter_text actor and do NOT bubble up to the
+    // SwitcherPopup's key-press-event. Handle all navigation here directly.
+    this._entry.clutter_text.connect('key-press-event', (_a, ev) => {
+      log(`[OneSwitch] key-press sym=${ev.get_key_symbol()}`);
+      return this._onKey(ev);
+    });
     this._box.add_child(this._entry);
 
     this._scroll = new St.ScrollView({ overlay_scrollbars: true });
@@ -60,8 +67,6 @@ class SwitcherPopup extends St.Widget {
     this._box.add_child(this._output);
 
     this._runner = new CommandRunner();
-
-    this.connect('key-press-event', (_a, ev) => this._onKey(ev));
   }
 
   open() {
@@ -159,6 +164,7 @@ class SwitcherPopup extends St.Widget {
   }
 
   _activateIndex(i) {
+    log(`[OneSwitch] _activateIndex(${i}) selected=${this._selected} items=${this._items.length}`);
     const it = this._items[i];
     if (this._mode === 'command') {
       const cmd = it ? it.title : '';
@@ -172,8 +178,12 @@ class SwitcherPopup extends St.Widget {
       Windows.raiseBrowserWindow(it.browser, it.title);
       return;
     }
-    if (it.kind === 'app') Apps.launch(it.appInfo);
-    else Windows.activate(it.metaWindow);
+    if (it.kind === 'app') {
+      Apps.launch(it.appInfo);
+    } else {
+      const win = it.metaWindow;
+      GLib.idle_add(GLib.PRIORITY_DEFAULT, () => { Windows.activate(win); return GLib.SOURCE_REMOVE; });
+    }
   }
 
   _runCommand(cmd) {
