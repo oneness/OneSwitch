@@ -3,6 +3,7 @@
 // Bridges the browser's tab list to a Unix socket read by the GNOME extension.
 import net from 'net';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -11,15 +12,27 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // framing.js uses Buffer natively under Node.
 const { encodeMessage, decodeMessages } = await import('./framing.js');
 
-// Log invocation to a temp file so we can debug whether Firefox launches us.
-import { appendFileSync } from 'fs';
-appendFileSync('/tmp/oneswitch-host.log', `[${new Date().toISOString()}] launched argv=${JSON.stringify(process.argv)}\n`);
-
 const arg = (process.argv[2] || '') + (process.argv[3] || '') + (process.argv[4] || '');
 const browser = arg.includes('firefox') || arg.includes('@birkey') ? 'firefox' : 'chrome';
 const sockPath = `${process.env.XDG_RUNTIME_DIR}/oneswitch-browser-${browser}.sock`;
 
+const cacheDir = path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'),
+  'oneswitch', 'favicons');
+
 let latestTabs = [];
+
+// Save data-URL favicons to disk so the GNOME extension can display them.
+function cacheFavicons(tabs) {
+  try { fs.mkdirSync(cacheDir, { recursive: true }); } catch (_) {}
+  for (const t of tabs) {
+    if (!t.url || !t.favIconUrl) continue;
+    const host = /^https?:\/\/([^/:]+)/.exec(t.url)?.[1];
+    if (!host) continue;
+    const m = /^data:image\/[^;]+;base64,(.+)$/.exec(t.favIconUrl);
+    if (!m) continue;
+    try { fs.writeFileSync(path.join(cacheDir, host), Buffer.from(m[1], 'base64')); } catch (_) {}
+  }
+}
 
 // --- Unix socket server for the GNOME Shell extension ---
 try { fs.unlinkSync(sockPath); } catch (_) {}
@@ -51,7 +64,10 @@ process.stdin.on('data', chunk => {
   const { messages, rest } = decodeMessages(inbuf);
   inbuf = rest;
   for (const m of messages) {
-    if (m.type === 'tabs') latestTabs = m.tabs;
+    if (m.type === 'tabs') {
+      latestTabs = m.tabs;
+      cacheFavicons(m.tabs);
+    }
   }
 });
 process.stdin.on('end', () => {

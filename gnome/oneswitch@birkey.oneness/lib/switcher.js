@@ -17,10 +17,8 @@ import * as Apps from './apps.js';
 import * as Browser from './browser.js';
 import * as Favicons from './favicons.js';
 
-export const SwitcherPopup = GObject.registerClass(
-class SwitcherPopup extends St.Widget {
-  _init() {
-    super._init({ reactive: true, visible: false });
+export class SwitcherPopup {
+  constructor() {
     this._grab = null;
     this._items = [];
     this._selected = 0;
@@ -28,29 +26,20 @@ class SwitcherPopup extends St.Widget {
     this._mode = 'search';
     this._history = [];
 
-    Main.layoutManager.modalDialogGroup.add_child(this);
-    this.add_constraint(new Clutter.BindConstraint({
-      source: Main.layoutManager.modalDialogGroup,
-      coordinate: Clutter.BindCoordinate.ALL,
-    }));
-
     this._box = new St.BoxLayout({
       style_class: 'oneswitch-popup',
+      reactive: true,
+      visible: false,
       vertical: true,
-      x_align: Clutter.ActorAlign.CENTER,
-      y_align: Clutter.ActorAlign.CENTER,
     });
-    this.add_child(this._box);
-    this._box.add_constraint(new Clutter.AlignConstraint({
-      source: this, align_axis: Clutter.AlignAxis.BOTH, factor: 0.5,
-    }));
+    // Add to global.stage so no layout manager can stretch or reposition it.
+    global.stage.insert_child_above(this._box, null);
 
     this._entry = new St.Entry({ style_class: 'oneswitch-entry', can_focus: true });
     this._entry.clutter_text.connect('text-changed', () => this._refilter());
-    // Key events go to the focused clutter_text actor and do NOT bubble up to the
-    // SwitcherPopup's key-press-event. Handle all navigation here directly.
     this._entry.clutter_text.connect('key-press-event', (_a, ev) => {
-      log(`[OneSwitch] key-press sym=${ev.get_key_symbol()}`);
+      const sym = ev.get_key_symbol();
+      log(`[OneSwitch] key sym=${sym} box=${this._box.x},${this._box.y} ${this._box.width}x${this._box.height}`);
       return this._onKey(ev);
     });
     this._box.add_child(this._entry);
@@ -70,36 +59,49 @@ class SwitcherPopup extends St.Widget {
   }
 
   open() {
-    if (this.visible) return;
+    if (this._box.visible) return;
     const focused = Windows.focusedWindowId();
     this._all = Windows.listWindows();
     this._tabs = Browser.listTabs();
     this._all = this._all.concat(this._tabs);
     this._apps = Apps.listApps(Windows.openAppIds());
-    this._items = composeResults(this._all, this._apps, '');
-    this._selected = preselectIndex(this._items, focused);
     this._history = readHistory();
     this._output.visible = false;
     this._output.set_text('');
     this._mode = 'search';
 
+    // set_text('') fires text-changed → _refilter() → _selected=0 if the entry
+    // was non-empty from the previous session. Compute items and preselection
+    // after set_text so the override wins.
     this._entry.set_text('');
+    this._items = composeResults(this._all, this._apps, '');
+    this._selected = preselectIndex(this._items, focused);
     this._render();
-    this.visible = true;
+    this._box.visible = true;
 
-    this._grab = Main.pushModal(this, { actionMode: Shell.ActionMode.POPUP });
+    // global.stage has no layout manager — set_position sticks.
+    GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+      const monitor = Main.layoutManager.primaryMonitor;
+      this._box.set_position(
+        Math.round(monitor.x + (monitor.width  - this._box.width)  / 2),
+        Math.round(monitor.y + (monitor.height - this._box.height) / 2),
+      );
+      return GLib.SOURCE_REMOVE;
+    });
+
+    this._grab = Main.pushModal(this._box, { actionMode: Shell.ActionMode.POPUP });
     if (!this._grab) { this.close(); return; }
     global.stage.set_key_focus(this._entry.clutter_text);
   }
 
   close() {
     if (this._runner) this._runner.cancel();
-    if (!this.visible) return;
+    if (!this._box.visible) return;
     if (this._grab) { Main.popModal(this._grab); this._grab = null; }
-    this.visible = false;
+    this._box.visible = false;
   }
 
-  toggle() { this.visible ? this.close() : this.open(); }
+  toggle() { this._box.visible ? this.close() : this.open(); }
 
   _refilter() {
     const parsed = parseQuery(this._entry.get_text());
@@ -218,5 +220,8 @@ class SwitcherPopup extends St.Widget {
     return Clutter.EVENT_PROPAGATE;
   }
 
-  destroy() { this.close(); super.destroy(); }
-});
+  destroy() {
+    this.close();
+    if (this._box) { this._box.destroy(); this._box = null; }
+  }
+}
