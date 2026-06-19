@@ -39,6 +39,19 @@
               --add-flags "-m $out/libexec/oneswitch/oneswitch-browser.js"
           '';
         };
+
+        webext = pkgs.stdenv.mkDerivation {
+          pname = "oneswitch-webext";
+          version = "1.0";
+          inherit src;
+          nativeBuildInputs = [ pkgs.zip ];
+          dontBuild = true;
+          installPhase = ''
+            mkdir -p $out/share/oneswitch
+            cd webext
+            zip -r $out/share/oneswitch/${uuid}.xpi manifest.json background.js
+          '';
+        };
       };
 
       devShells.${system}.default = pkgs.mkShell {

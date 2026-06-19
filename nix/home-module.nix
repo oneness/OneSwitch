@@ -1,9 +1,10 @@
 { config, lib, pkgs, oneswitch, ... }:
-# `oneswitch` = { extension, host } from the flake's packages.
+# `oneswitch` = { extension, host, webext } from the flake's packages.
 let
   hostPath = "${oneswitch.host}/bin/oneswitch-browser";
   hostName = "health.oneness.oneswitch";
   uuid = "oneswitch@birkey.oneness";
+  xpiPath = "${oneswitch.webext}/share/oneswitch/${uuid}.xpi";
 
   chromeManifest = builtins.toJSON {
     name = hostName;
@@ -33,4 +34,12 @@ in {
   home.file.".config/google-chrome/NativeMessagingHosts/${hostName}.json".text = chromeManifest;
   home.file.".config/chromium/NativeMessagingHosts/${hostName}.json".text = chromeManifest;
   home.file.".mozilla/native-messaging-hosts/${hostName}.json".text = firefoxManifest;
+
+  # Force-install the Firefox web extension so it loads at every Firefox startup.
+  programs.firefox.policies.ExtensionSettings = {
+    "${uuid}" = {
+      installation_mode = "force_installed";
+      install_url = "file://${xpiPath}";
+    };
+  };
 }

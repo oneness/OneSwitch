@@ -55,11 +55,8 @@ xpi:
 # Works on Firefox Developer Edition and Firefox ESR (allows unsigned extensions).
 # On standard Firefox release, signatures are enforced — use Dev Edition instead.
 #
-# NixOS home-manager alternative (add to your firefox config):
-#   policies.ExtensionSettings."oneswitch@birkey.oneness" = {
-#     installation_mode = "force_installed";
-#     install_url = "file://$(XPI_OUT)";
-#   };
+# NixOS users: use nix/home-module.nix instead — it handles this automatically
+# via programs.firefox.policies.ExtensionSettings (force_installed).
 install-firefox-ext: xpi
 	@FF_PROFILE=$$(find "$(HOME)/.mozilla/firefox" -maxdepth 2 -name "prefs.js" 2>/dev/null \
 	  | head -1 | xargs -I{} dirname {}); \
