@@ -7,5 +7,25 @@
       <summary>Open/close the switcher</summary>
       <description>Global hotkey that toggles the OneSwitch popup.</description>
     </key>
+    <key name="hide-titlebar" type="b">
+      <default>false</default>
+      <summary>Hide window title bars</summary>
+      <description>When enabled, window title bars are hidden when maximized/tiled/always, and the title is shown in the top panel instead.</description>
+    </key>
+    <key name="titlebar-hide-mode" type="s">
+      <default>'maximized'</default>
+      <summary>Title bar hiding mode</summary>
+      <description>When to hide the title bar: 'maximized' (when fully maximized), 'always' (always), or 'tiled' (when tiled or maximized).</description>
+    </key>
+    <key name="panel-show-title" type="b">
+      <default>true</default>
+      <summary>Show window title in panel</summary>
+      <description>When the title bar is hidden, show the window title in the top panel.</description>
+    </key>
+    <key name="panel-show-buttons" type="b">
+      <default>true</default>
+      <summary>Show window buttons in panel</summary>
+      <description>When the title bar is hidden, show window control buttons (close, minimize, maximize) in the top panel.</description>
+    </key>
   </schema>
 </schemalist>

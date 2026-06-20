@@ -32,3 +32,39 @@
   background-color: rgba(0, 0, 0, 0.35);
   color: rgba(255, 255, 255, 0.9);
 }
+
+/* --- Panel Title Widget (hide-titlebar feature) --- */
+
+.oneswitch-panel-title-label {
+  font-weight: 500;
+  font-size: 11.5px;
+  padding: 0 4px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.oneswitch-panel-title-buttons {
+  spacing: 2px;
+}
+
+.oneswitch-panel-title-button {
+  padding: 0 4px;
+  border-radius: 4px;
+  min-width: 20px;
+  min-height: 20px;
+}
+
+.oneswitch-panel-title-button:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.oneswitch-panel-title-button:active {
+  background-color: rgba(255, 255, 255, 0.20);
+}
+
+.oneswitch-panel-title-button:first-child:hover {
+  background-color: rgba(255, 80, 80, 0.35);
+}
+
+.oneswitch-panel-title-button-icon {
+  icon-size: 14px;
+}

@@ -6,40 +6,35 @@ import { ExtensionPreferences } from 'resource:///org/gnome/Shell/Extensions/js/
 export default class OneSwitchPrefs extends ExtensionPreferences {
   fillPreferencesWindow(window) {
     const settings = this.getSettings();
-    const page = new Adw.PreferencesPage();
-    const group = new Adw.PreferencesGroup({ title: 'Hotkey' });
-    page.add(group);
 
-    const row = new Adw.ActionRow({
+    // ---- Hotkey page ----
+    const hotkeyPage = new Adw.PreferencesPage();
+    const hotkeyGroup = new Adw.PreferencesGroup({ title: 'Hotkey' });
+    hotkeyPage.add(hotkeyGroup);
+
+    const hotkeyRow = new Adw.ActionRow({
       title: 'Open switcher',
       subtitle: currentLabel(settings) || 'Disabled — click Record',
     });
-    const button = new Gtk.Button({ label: 'Record', valign: Gtk.Align.CENTER });
-    row.add_suffix(button);
-    group.add(row);
-    window.add(page);
+    const recordBtn = new Gtk.Button({ label: 'Record', valign: Gtk.Align.CENTER });
+    hotkeyRow.add_suffix(recordBtn);
+    hotkeyGroup.add(hotkeyRow);
+    window.add(hotkeyPage);
 
-    // Keep subtitle in sync whenever the setting changes (including after recording).
     settings.connect('changed::hotkey', () => {
-      row.set_subtitle(currentLabel(settings) || 'Disabled — click Record');
+      hotkeyRow.set_subtitle(currentLabel(settings) || 'Disabled — click Record');
     });
 
-    button.connect('clicked', () => {
+    recordBtn.connect('clicked', () => {
       const previous = current(settings);
-      // Clear the hotkey so the extension drops the global binding — otherwise
-      // the shell intercepts the key combo before this window can capture it.
       settings.set_strv('hotkey', ['']);
-      button.set_label('Press a combo…');
+      recordBtn.set_label('Press a combo…');
       const ctl = new Gtk.EventControllerKey();
-      // CAPTURE phase: fires before any child widget handles the event.
       ctl.set_propagation_phase(Gtk.PropagationPhase.CAPTURE);
       window.add_controller(ctl);
       ctl.connect('key-pressed', (_c, keyval, _code, state) => {
-        // Ignore lone modifier presses (Shift, Ctrl, Alt, AltGr, Super, …).
-        // Gdk.keyval_is_modifier() is unavailable in some GJS builds; use ranges.
         if (isModifier(keyval)) return true;
         if (keyval === Gdk.KEY_Escape) {
-          // Restore previous binding on cancel.
           if (previous) settings.set_strv('hotkey', [previous]);
           reset();
           window.remove_controller(ctl);
@@ -47,22 +42,95 @@ export default class OneSwitchPrefs extends ExtensionPreferences {
         }
         const mods = state & Gtk.accelerator_get_default_mod_mask();
         const accel = Gtk.accelerator_name(keyval, mods);
-        // Save the accelerator; the settings listener above updates the subtitle.
         settings.set_strv('hotkey', [accel]);
         reset();
         window.remove_controller(ctl);
         return true;
       });
-      function reset() { button.set_label('Record'); }
+      function reset() { recordBtn.set_label('Record'); }
     });
+
+    // ---- Title bar page ----
+    const titlePage = new Adw.PreferencesPage({ title: 'Title Bar' });
+    const titleGroup = new Adw.PreferencesGroup({
+      title: 'Window Title Bar',
+      description: 'Hide title bars on maximized windows and show the title in the top panel.',
+    });
+    titlePage.add(titleGroup);
+
+    // Master toggle
+    const masterRow = new Adw.ActionRow({ title: 'Hide title bar' });
+    const masterSwitch = new Gtk.Switch({
+      active: settings.get_boolean('hide-titlebar'),
+      valign: Gtk.Align.CENTER,
+    });
+    masterRow.add_suffix(masterSwitch);
+    titleGroup.add(masterRow);
+
+    const syncSensitivity = () => {
+      const active = masterSwitch.active;
+      modeCombo.sensitive = active;
+      showTitleSwitch.sensitive = active;
+      showButtonsSwitch.sensitive = active;
+    };
+
+    masterSwitch.connect('notify::active', () => {
+      settings.set_boolean('hide-titlebar', masterSwitch.active);
+      syncSensitivity();
+    });
+
+    // Hide mode
+    const modeRow = new Adw.ActionRow({ title: 'Hide mode', subtitle: 'When to hide the title bar' });
+    const modeCombo = new Gtk.ComboBoxText({
+      valign: Gtk.Align.CENTER,
+      sensitive: settings.get_boolean('hide-titlebar'),
+    });
+    modeCombo.append('maximized', 'When maximized');
+    modeCombo.append('tiled', 'When tiled or maximized');
+    modeCombo.append('always', 'Always');
+    const curMode = settings.get_string('titlebar-hide-mode');
+    modeCombo.set_active_id(curMode || 'maximized');
+    modeRow.add_suffix(modeCombo);
+    titleGroup.add(modeRow);
+
+    modeCombo.connect('changed', () => {
+      settings.set_string('titlebar-hide-mode', modeCombo.get_active_id());
+    });
+
+    // Show window title in panel
+    const showTitleRow = new Adw.ActionRow({ title: 'Show window title in panel' });
+    const showTitleSwitch = new Gtk.Switch({
+      active: settings.get_boolean('panel-show-title'),
+      valign: Gtk.Align.CENTER,
+      sensitive: settings.get_boolean('hide-titlebar'),
+    });
+    showTitleRow.add_suffix(showTitleSwitch);
+    titleGroup.add(showTitleRow);
+
+    showTitleSwitch.connect('notify::active', () => {
+      settings.set_boolean('panel-show-title', showTitleSwitch.active);
+    });
+
+    // Show window buttons in panel
+    const showButtonsRow = new Adw.ActionRow({ title: 'Show window buttons in panel' });
+    const showButtonsSwitch = new Gtk.Switch({
+      active: settings.get_boolean('panel-show-buttons'),
+      valign: Gtk.Align.CENTER,
+      sensitive: settings.get_boolean('hide-titlebar'),
+    });
+    showButtonsRow.add_suffix(showButtonsSwitch);
+    titleGroup.add(showButtonsRow);
+
+    showButtonsSwitch.connect('notify::active', () => {
+      settings.set_boolean('panel-show-buttons', showButtonsSwitch.active);
+    });
+
+    window.add(titlePage);
   }
 }
 
 function isModifier(keyval) {
-  // Standard modifier keysyms: Shift_L/R, Control_L/R, Caps_Lock, Shift_Lock,
-  // Meta_L/R, Alt_L/R, Super_L/R, Hyper_L/R are all in 0xFFE1–0xFFEE.
   if (keyval >= 0xFFE1 && keyval <= 0xFFEE) return true;
-  // ISO level-shift (AltGr = 0xFE03), Mode_switch (0xFF7E), Num_Lock (0xFF7F).
   if (keyval === 0xFE03 || keyval === 0xFE11 || keyval === 0xFF7E || keyval === 0xFF7F) return true;
   return false;
 }
@@ -72,8 +140,6 @@ function current(settings) {
   return v && v.length ? v[0] : '';
 }
 
-// Returns a human-readable label (e.g. "Ctrl+Alt+S") from the stored accelerator.
-// AdwActionRow.subtitle is Pango markup, so raw "<Primary><Alt>s" would be invisible.
 function currentLabel(settings) {
   const accel = current(settings);
   if (!accel) return '';
