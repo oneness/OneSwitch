@@ -15,6 +15,7 @@
           pname = "oneswitch-gnome-extension";
           version = "1.0";
           inherit src;
+          dontBuild = true;
           nativeBuildInputs = [ pkgs.glib ];
           installPhase = ''
             dest=$out/share/gnome-shell/extensions/${uuid}
