@@ -25,6 +25,7 @@ export class SwitcherPopup {
     this._rows = [];
     this._mode = 'search';
     this._history = [];
+    this._opening = false;
 
     this._box = new St.BoxLayout({
       style_class: 'oneswitch-popup',
@@ -36,7 +37,7 @@ export class SwitcherPopup {
     global.stage.insert_child_above(this._box, null);
 
     this._entry = new St.Entry({ style_class: 'oneswitch-entry', can_focus: true });
-    this._entry.clutter_text.connect('text-changed', () => this._refilter());
+    this._entry.clutter_text.connect('text-changed', () => { if (!this._opening) this._refilter(); });
     this._entry.clutter_text.connect('key-press-event', (_a, ev) => {
       const sym = ev.get_key_symbol();
       log(`[OneSwitch] key sym=${sym} box=${this._box.x},${this._box.y} ${this._box.width}x${this._box.height}`);
@@ -70,12 +71,12 @@ export class SwitcherPopup {
     this._output.set_text('');
     this._mode = 'search';
 
-    // set_text('') fires text-changed → _refilter() → _selected=0 if the entry
-    // was non-empty from the previous session. Compute items and preselection
-    // after set_text so the override wins.
+    this._opening = true;
     this._entry.set_text('');
+    this._opening = false;
     this._items = composeResults(this._all, this._apps, '');
     this._selected = preselectIndex(this._items, focused);
+    log(`[OneSwitch] open: focusedId=${focused} preselect=${this._selected} item="${this._items[this._selected]?.title}" item0="${this._items[0]?.title}" item1="${this._items[1]?.title}"`);
     this._render();
     this._box.visible = true;
 
@@ -104,6 +105,7 @@ export class SwitcherPopup {
   toggle() { this._box.visible ? this.close() : this.open(); }
 
   _refilter() {
+    log(`[OneSwitch] _refilter called, text="${this._entry.get_text()}"`);
     const parsed = parseQuery(this._entry.get_text());
     this._mode = parsed.mode;
     if (parsed.mode === 'command') {

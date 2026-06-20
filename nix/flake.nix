@@ -37,6 +37,12 @@
             chmod +x $out/libexec/oneswitch/oneswitch-browser.js
             makeWrapper ${pkgs.gjs}/bin/gjs $out/bin/oneswitch-browser \
               --add-flags "-m $out/libexec/oneswitch/oneswitch-browser.js"
+
+            # Native messaging host manifest for Firefox.
+            mkdir -p $out/lib/mozilla/native-messaging-hosts
+            substitute native-host/manifests/firefox.json.in \
+              $out/lib/mozilla/native-messaging-hosts/health.oneness.oneswitch.json \
+              --subst-var-by HOST_PATH $out/bin/oneswitch-browser
           '';
         };
 

@@ -1,5 +1,7 @@
-// Cross-browser: `chrome` exists in both Chrome and Firefox MV3.
-const api = chrome;
+// Firefox exposes `browser` (Promise-based); Chrome only has `chrome`.
+// chrome.tabs.query({}) without a callback returns undefined in Firefox MV2,
+// so we always use the callback form wrapped in a Promise.
+const api = typeof browser !== 'undefined' ? browser : chrome;
 const HOST = 'health.oneness.oneswitch';
 let port = null;
 
@@ -12,10 +14,11 @@ function connect() {
 
 async function pushTabs() {
   if (!port) return;
-  const tabs = await api.tabs.query({});
+  const tabs = await new Promise(resolve => api.tabs.query({}, resolve));
+  if (!port) return;
   port.postMessage({
     type: 'tabs',
-    tabs: tabs.map(t => ({
+    tabs: (tabs || []).map(t => ({
       tabId: t.id, windowId: t.windowId, title: t.title || '',
       url: t.url || '', favIconUrl: t.favIconUrl || '',
     })),
