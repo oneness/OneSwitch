@@ -59,20 +59,35 @@ nix develop       # provides gjs, glib-compile-schemas, gnome-shell, node, zip, 
 
 ## NixOS install (declarative)
 
-In your home-manager config:
+Add the flake as an input to your NixOS flake:
 
 ```nix
-{ inputs, ... }:
-let oneswitch = inputs.oneswitch.packages.x86_64-linux;
-in {
-  imports = [ (import ./path/to/nix/home-module.nix { inherit (oneswitch) extension host; }) ];
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    oneswitch = {
+      url = "path:/path/to/OneSwitch?dir=nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+
+  outputs = { nixpkgs, oneswitch, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      modules = [
+        {
+          environment.systemPackages = [ oneswitch.packages.x86_64-linux.extension ];
+          # Optional: native host for browser tabs
+          # programs.firefox.nativeMessagingHosts.packages = [ oneswitch.packages.x86_64-linux.host ];
+        }
+      ];
+    };
+  };
 }
 ```
 
 Then load the WebExtension once per browser (unpacked from `gnome/webext/`), set
 `allowed_origins` in the Chrome manifest to your unpacked extension id, and log out/in
-(or restart GNOME Shell) so the extension and keybinding load. The browser
-native-messaging manifests are written automatically.
+(or restart GNOME Shell) so the extension and keybinding load.
 
 ## Browser tabs setup
 

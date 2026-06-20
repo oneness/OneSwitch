@@ -18,4 +18,4 @@ Install the filled manifest to:
 | Chromium  | `~/.config/chromium/NativeMessagingHosts/health.oneness.oneswitch.json` |
 | Firefox   | `~/.mozilla/native-messaging-hosts/health.oneness.oneswitch.json` |
 
-Phase 5's home-manager module writes these automatically with the correct host path.
+On NixOS, add `oneswitch.packages.x86_64-linux.host` to `programs.firefox.nativeMessagingHosts.packages` in your NixOS config — the manifest is written automatically with the correct host path.
