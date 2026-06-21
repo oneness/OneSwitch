@@ -7,7 +7,7 @@
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
-      uuid = "oneswitch@birkey.oneness";
+      uuid = "oneswitch@birkey.co";
       src = ./gnome;
     in {
       packages.${system} = {

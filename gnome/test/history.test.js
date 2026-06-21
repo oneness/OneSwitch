@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseHistory, matchHistory } from '../oneswitch@birkey.oneness/lib/history.js';
+import { parseHistory, matchHistory } from '../oneswitch@birkey.co/lib/history.js';
 
 test('bash history: most-recent-first, de-duped, blanks dropped', () => {
   const content = 'ls\n\ncd /tmp\nls\n';

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { filterAndRank, composeResults } from '../oneswitch@birkey.oneness/lib/model.js';
+import { filterAndRank, composeResults } from '../oneswitch@birkey.co/lib/model.js';
 
 const items = [
   { id: 1, title: 'Inbox — Gmail', appName: 'Firefox' },

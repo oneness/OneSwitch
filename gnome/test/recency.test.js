@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { preselectIndex } from '../oneswitch@birkey.oneness/lib/recency.js';
+import { preselectIndex } from '../oneswitch@birkey.co/lib/recency.js';
 
 test('skips the focused window, selecting the next most-recent', () => {
   const items = [

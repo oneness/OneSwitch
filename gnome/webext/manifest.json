@@ -6,6 +6,6 @@
   "permissions": ["tabs", "nativeMessaging"],
   "background": { "scripts": ["background.js"], "persistent": true },
   "browser_specific_settings": {
-    "gecko": { "id": "oneswitch@birkey.oneness" }
+    "gecko": { "id": "oneswitch@birkey.co" }
   }
 }

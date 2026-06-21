@@ -40,7 +40,7 @@ A right-panel grid icon opens a menu: *Open switcher*, *Hide/Show title bars*, *
 Open via the indicator → *Preferences*, or:
 
 ```sh
-gnome-extensions prefs oneswitch@birkey.oneness
+gnome-extensions prefs oneswitch@birkey.co
 ```
 
 - **Hotkey** — click *Record* and press any combo to replace Control+Tab.
@@ -112,7 +112,7 @@ After `sudo nixos-rebuild switch`, log out and back in. The extension loads auto
 |---|---|
 | `extension` | The GNOME Shell extension (installs into `share/gnome-shell/extensions/`) |
 | `host` | Native messaging host binary + Firefox manifest |
-| `webext` | Packed `.xpi` at `share/oneswitch/oneswitch@birkey.oneness.xpi` |
+| `webext` | Packed `.xpi` at `share/oneswitch/oneswitch@birkey.co.xpi` |
 
 ### Browser tabs (optional)
 
@@ -139,7 +139,7 @@ make nested    # launch a nested GNOME Shell (Wayland)
 Inside the nested shell:
 
 ```sh
-gnome-extensions enable oneswitch@birkey.oneness
+gnome-extensions enable oneswitch@birkey.co
 ```
 
 Logs: `make logs` (or Alt+F2 → `lg` for Looking Glass).
@@ -150,4 +150,4 @@ nix develop    # devShell: gjs, glib-compile-schemas, gnome-shell, node, zip, es
 
 ## Extension UUID
 
-`oneswitch@birkey.oneness`
+`oneswitch@birkey.co`

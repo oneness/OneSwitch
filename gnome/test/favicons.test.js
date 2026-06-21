@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { faviconKey } from '../oneswitch@birkey.oneness/lib/favicons.js';
+import { faviconKey } from '../oneswitch@birkey.co/lib/favicons.js';
 
 test('faviconKey is the host of an http(s) url', () => {
   assert.equal(faviconKey('https://mail.google.com/mail/u/0'), 'mail.google.com');

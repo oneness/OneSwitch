@@ -1,4 +1,4 @@
-UUID     = oneswitch@birkey.oneness
+UUID     = oneswitch@birkey.co
 SRC      = $(UUID)
 DEST     = $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 SCHEMAS  = /nix/store/q9ksx8c79jfj1cawwwzmpq3qapvpvab7-glib-2.88.1-dev/bin/glib-compile-schemas
