@@ -63,7 +63,7 @@ class PanelTitleWidget extends PanelMenu.Button {
     // Maximize/restore button
     this._maxBtn = this._makeButton('window-maximize-symbolic', () => {
       if (!this._focusedWin) return;
-      if (this._focusedWin.get_maximized() === Meta.MaximizeFlags.BOTH)
+      if (this._focusedWin.maximized_horizontally && this._focusedWin.maximized_vertically)
         this._focusedWin.unmaximize(Meta.MaximizeFlags.BOTH);
       else
         this._focusedWin.maximize(Meta.MaximizeFlags.BOTH);
@@ -97,7 +97,7 @@ class PanelTitleWidget extends PanelMenu.Button {
     });
     btn.set_child(new St.Icon({
       icon_name: iconName,
-      icon_size: 14,
+      icon_size: 12,
       style_class: 'oneswitch-panel-title-button-icon',
     }));
     btn.connect('clicked', () => callback());
@@ -143,7 +143,7 @@ class PanelTitleWidget extends PanelMenu.Button {
     }
 
     // Update maximize/restore icon
-    const isMaximized = win.get_maximized() === Meta.MaximizeFlags.BOTH;
+    const isMaximized = win.maximized_horizontally && win.maximized_vertically;
     this._maxBtn.child.icon_name = isMaximized
       ? 'window-restore-symbolic'
       : 'window-maximize-symbolic';
@@ -161,14 +161,14 @@ class PanelTitleWidget extends PanelMenu.Button {
 
   _windowShouldHide(win) {
     if (!win) return false;
-    if (win.is_fullscreen()) return false;
-    if (win.is_minimized()) return false;
+    if (win.fullscreen) return false;
+    if (win.minimized) return false;
 
     const mode = this._settings?.get_string('titlebar-hide-mode') ?? 'maximized';
     if (mode === 'always') return true;
 
-    const maxH = win.get_maximized_horizontally();
-    const maxV = win.get_maximized_vertically();
+    const maxH = win.maximized_horizontally;
+    const maxV = win.maximized_vertically;
 
     if (mode === 'maximized') return maxH && maxV;
     if (mode === 'tiled') return maxH || maxV;

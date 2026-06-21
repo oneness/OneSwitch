@@ -8,7 +8,7 @@
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
       uuid = "oneswitch@birkey.oneness";
-      src = ../gnome;
+      src = ./gnome;
     in {
       packages.${system} = {
         extension = pkgs.stdenv.mkDerivation {

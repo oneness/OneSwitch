@@ -1,99 +1,153 @@
-# OneSwitch for GNOME (Wayland)
+# OneSwitch for GNOME
 
-GNOME 47 Shell extension. Spotlight-style window/tab switcher and launcher triggered by a global hotkey.
+GNOME Shell extension (GNOME 47–50, Wayland) — a Spotlight-style window/tab switcher and launcher on a global hotkey.
 
-## Features
+## What it does
 
-- **Window switcher** — lists open windows MRU-first; previous window preselected so Control+Tab → Enter bounces between your two most recent windows.
-- **App launcher** — installed-but-not-running apps appear while searching; Enter launches.
-- **Command mode** — type `>` then a shell command; shell-history picker; Enter or Ctrl+J runs it; output shown + copied to clipboard; Esc kills a running command.
-- **Browser tabs** — Chrome and Firefox tabs with favicons (Phase 4).
-- **Indicator + Preferences** — top-bar menu and hotkey recorder (Phase 5).
+Press **Control+Tab** (configurable) to open a centered popup. Type to filter, navigate with the keyboard, and press Enter to go there.
 
-## Dev loop (no logout needed)
+### Window switcher & app launcher
 
-```
-make test        # run pure-module unit tests (Node)
-make install     # copy extension + compile schema into ~/.local/share
-make nested      # launch a nested GNOME Shell (Wayland)
-```
+- Lists every open window MRU-first with app icons.
+- The previous window is preselected, so Control+Tab → Enter bounces between your two most recent windows.
+- Typing a query also surfaces installed-but-not-running apps; Enter launches them.
+- Orderless token search: space-separated terms match in any order against window title and app name.
 
-Inside the nested shell:
-```
-gnome-extensions enable oneswitch@birkey.oneness
-```
+### Browser tabs
 
-Press **Control+Tab** to open the switcher.
+Chrome and Firefox tabs appear inline with page favicons. Favicons are fetched from DuckDuckGo's favicon service and cached on disk. Requires the WebExtension and native host bridge (see [Browser tabs setup](#browser-tabs-setup)).
 
-Logs: `make logs` (or Alt-F2 → `lg` for Looking Glass).
+### Command mode
 
-## Acceptance checklist
+Type `>` to enter command mode. Matching shell history entries appear as you type; Enter runs the selected one, Ctrl+J runs exactly what you typed. Output (stdout + stderr) is shown in the popup and copied to the clipboard. Esc kills a running command.
 
-### Phase 1 — Core switcher
-- [ ] Control+Tab opens a centered popup; the **previous** window is preselected.
-- [ ] Typing filters; Tab/↓/Ctrl-N and Shift-Tab/↑/Ctrl-P move selection.
-- [ ] Enter activates the selected window; Esc dismisses.
-- [ ] Control+Tab → Enter bounces between the two most-recent windows.
+### Title bar management
 
-### Phase 2 — App launcher
-- [ ] Empty query: only open windows, no apps.
-- [ ] With a query: matching apps appear below windows, with icons.
-- [ ] Enter on an app row launches it.
+Optionally hide window title bars on maximized/tiled windows (Unite-style):
 
-### Phase 3 — Command mode
-- [ ] Typing `>` switches to command mode; shell-history entries filter as you type.
-- [ ] Enter on a history row runs it; output + `[exit N]` shows in the popup.
-- [ ] Ctrl+J runs the typed command (not a history selection).
-- [ ] Output is copied to clipboard.
-- [ ] Esc kills a running command and closes the popup.
+- **GTK/Wayland (CSD) apps** — injects CSS into `~/.config/gtk-{3,4}.0/gtk.css`; GTK picks it up live via inotify.
+- **XWayland (SSD) apps** — sets Motif WM hints via `xprop` and toggles `window.decorated`.
+- **Modes** — *When maximized* (default), *When tiled or maximized*, *Always*.
 
-## NixOS devShell
+When title bars are hidden, the focused window's title appears in the top panel, with optional close/minimize/maximize buttons.
 
-```
-nix develop       # provides gjs, glib-compile-schemas, gnome-shell, node, zip, eslint
+### Panel indicator
+
+A right-panel grid icon opens a menu: *Open switcher*, *Hide/Show title bars*, *Preferences*.
+
+### Preferences
+
+Open via the indicator → *Preferences*, or:
+
+```sh
+gnome-extensions prefs oneswitch@birkey.oneness
 ```
 
-## Extension UUID
+- **Hotkey** — click *Record* and press any combo to replace Control+Tab.
+- **Title bar** — master toggle, hide mode (maximized/tiled/always), show window title in panel, show window buttons in panel.
 
-`oneswitch@birkey.oneness`
+## Keys
 
-## NixOS install (declarative)
+| Key | Action |
+|---|---|
+| **Control+Tab** | Toggle the switcher (previous window preselected) |
+| **Tab** / **Shift+Tab** | Move selection down / up |
+| **↓ / ↑** or **Ctrl+N / Ctrl+P** | Move selection down / up |
+| **Return** | Activate — switch to window, launch app, or run command |
+| **Ctrl+J** | In `>` mode — run exactly what is typed |
+| **Esc** | Dismiss (kills a running command first) |
+| Click | Activate that row |
 
-Add the flake as an input to your NixOS flake:
+## Getting started (NixOS flake)
+
+The extension, native host, and WebExtension are all built from the `nix/` flake. Here is a complete example of what a `~/.dotfiles/flake.nix` looks like with OneSwitch wired in:
 
 ```nix
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
     oneswitch = {
-      url = "path:/path/to/OneSwitch?dir=nix";
+      url = "github:oneness/OneSwitch?dir=nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { nixpkgs, oneswitch, ... }: {
-    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+  outputs = { self, nixpkgs, oneswitch, ... }: {
+    nixosConfigurations.myhostname = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = { inherit oneswitch; };
       modules = [
-        {
-          environment.systemPackages = [ oneswitch.packages.x86_64-linux.extension ];
-          # Optional: native host for browser tabs
-          # programs.firefox.nativeMessagingHosts.packages = [ oneswitch.packages.x86_64-linux.host ];
-        }
+        ./configuration.nix
       ];
     };
   };
 }
 ```
 
-Then load the WebExtension once per browser (unpacked from `gnome/webext/`), set
-`allowed_origins` in the Chrome manifest to your unpacked extension id, and log out/in
-(or restart GNOME Shell) so the extension and keybinding load.
+Then in `configuration.nix` (or any module it imports):
+
+```nix
+{ oneswitch, pkgs, ... }: {
+  # Install and auto-enable the GNOME Shell extension
+  programs.gnome-shell = {
+    enable = true;
+    extensions = [
+      { package = oneswitch.packages.${pkgs.system}.extension; }
+    ];
+  };
+
+  # Optional: native messaging host for browser tab support
+  programs.firefox.nativeMessagingHosts.packages = [
+    oneswitch.packages.${pkgs.system}.host
+  ];
+}
+```
+
+After `sudo nixos-rebuild switch`, log out and back in. The extension loads automatically — no manual `gnome-extensions enable` needed when installed this way.
+
+### Available flake packages
+
+| Package | What it builds |
+|---|---|
+| `extension` | The GNOME Shell extension (installs into `share/gnome-shell/extensions/`) |
+| `host` | Native messaging host binary + Firefox manifest |
+| `webext` | Packed `.xpi` at `share/oneswitch/oneswitch@birkey.oneness.xpi` |
+
+### Browser tabs (optional)
+
+**Native host** is covered above via `programs.firefox.nativeMessagingHosts.packages`.
+
+**WebExtension** — install the `.xpi` from the `webext` package, or load unpacked in developer mode (see [Browser tabs setup](#browser-tabs-setup)).
+
+Once both are running a Unix socket appears at `$XDG_RUNTIME_DIR/oneswitch-browser-{chrome,firefox}.sock` and tabs show up in the switcher automatically.
 
 ## Browser tabs setup
 
-1. Chrome: `chrome://extensions` → Developer mode → Load unpacked → `gnome/webext/`
-   - Note the extension id; the Chrome native-messaging manifest will need it as `allowed_origins`.
-2. Firefox: `about:debugging` → This Firefox → Load Temporary Add-on → `gnome/webext/manifest.json`
+**Chrome:** `chrome://extensions` → Developer mode → *Load unpacked* → `gnome/webext/`
 
-Once the WebExtension is running and the native host is installed, a socket appears at
-`$XDG_RUNTIME_DIR/oneswitch-browser-{chrome,firefox}.sock` and tabs show up in the switcher.
+**Firefox:** `about:debugging` → This Firefox → *Load Temporary Add-on* → `gnome/webext/manifest.json`
+
+## Dev loop (no logout needed)
+
+```sh
+make test      # run pure-module unit tests (Node)
+make install   # copy extension + compile schema into ~/.local/share
+make nested    # launch a nested GNOME Shell (Wayland)
+```
+
+Inside the nested shell:
+
+```sh
+gnome-extensions enable oneswitch@birkey.oneness
+```
+
+Logs: `make logs` (or Alt+F2 → `lg` for Looking Glass).
+
+```sh
+nix develop    # devShell: gjs, glib-compile-schemas, gnome-shell, node, zip, eslint
+```
+
+## Extension UUID
+
+`oneswitch@birkey.oneness`

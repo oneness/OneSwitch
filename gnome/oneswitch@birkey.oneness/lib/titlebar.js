@@ -7,8 +7,8 @@
 //      CSS hides headerbars using .maximized/.tiled classes.
 //   2. SSD (X11/XWayland) apps: xprop _MOTIF_WM_HINTS via Util.spawn.
 //
-// Per-window tracking: win.connect('size-changed') for maximize detection.
-// Callbacks notify panel-title.js.
+// Per-window tracking: notify::maximized-* signals for maximize detection
+// (more reliable than size-changed on Wayland). Callbacks notify panel-title.js.
 
 import Meta from 'gi://Meta';
 import GLib from 'gi://GLib';
@@ -187,9 +187,9 @@ export class TitleBarManager {
 
     // 3. Restore all tracked windows
     for (const [win, state] of this._windows) {
-      if (state.signalId) { try { win.disconnect(state.signalId); } catch (_) {} }
-      if (state.titleId) { try { win.disconnect(state.titleId); } catch (_) {} }
-      if (state.unmanagedId) { try { win.disconnect(state.unmanagedId); } catch (_) {} }
+      for (const key of ['signalId', 'maxHId', 'maxVId', 'titleId', 'unmanagedId']) {
+        if (state[key]) { try { win.disconnect(state[key]); } catch (_) {} }
+      }
       if (state.hidden) this._showDecorations(win, state);
     }
     this._windows.clear();
@@ -282,6 +282,16 @@ export class TitleBarManager {
         this._updateWindow(win);
         this._onWindowSizeChanged(win);
       }),
+      // notify::maximized-* fires WHEN the property changes, which is more
+      // reliable than size-changed (which can precede the flag update on Wayland).
+      maxHId: win.connect('notify::maximized-horizontally', () => {
+        this._updateWindow(win);
+        this._onWindowSizeChanged(win);
+      }),
+      maxVId: win.connect('notify::maximized-vertically', () => {
+        this._updateWindow(win);
+        this._onWindowSizeChanged(win);
+      }),
       titleId: win.connect('notify::title', () => {
         this._onWindowTitleChanged(win);
       }),
@@ -291,7 +301,11 @@ export class TitleBarManager {
     };
 
     this._windows.set(win, state);
-    this._updateWindow(win);
+    // Use idle to let Mutter finish setting up the window before we inspect it.
+    GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+      if (this._windows.has(win)) this._updateWindow(win);
+      return GLib.SOURCE_REMOVE;
+    });
   }
 
   _onWindowSizeChanged(win) {
@@ -328,14 +342,14 @@ export class TitleBarManager {
   _shouldHide(win) {
     if (!this._enabled) return false;
     if (!this._settings.get_boolean('hide-titlebar')) return false;
-    if (win.is_fullscreen()) return false;
-    if (win.is_minimized()) return false;
+    if (win.fullscreen) return false;
+    if (win.minimized) return false;
 
     const mode = this._settings.get_string('titlebar-hide-mode');
     if (mode === 'always') return true;
 
-    const maxH = win.get_maximized_horizontally();
-    const maxV = win.get_maximized_vertically();
+    const maxH = win.maximized_horizontally;
+    const maxV = win.maximized_vertically;
 
     if (mode === 'maximized') return maxH && maxV;
     if (mode === 'tiled') return maxH || maxV;
@@ -376,21 +390,28 @@ export class TitleBarManager {
       if (state.wasDecorated === null)
         state.wasDecorated = win.decorated;
 
-      // For CSD (Wayland GTK) apps: CSS injection handles the visual hiding.
-      // We also send the protocol hint as a secondary measure.
-      try { win.set_gtk_hide_titlebar_when_maximized(true); } catch (_) {}
+      const csd = this._isClientDecorated(win);
+      const xid = this._getXid(win);
+      log(`[OneSwitch] titlebar: hide csd=${csd} xid=${xid} decorated=${win.decorated} title="${win.get_title()}"`);
 
-      // For SSD (X11/XWayland): use Motif hints via xprop (same as Unite)
-      if (!this._isClientDecorated(win)) {
-        this._setMotifHints(win, false);
-        try { win.decorated = false; } catch (_) {}
+      if (!csd) {
+        if (xid) {
+          // X11/XWayland: Motif hints via xprop (Unite approach)
+          const hasFrame = win.get_frame_type
+            ? win.get_frame_type() !== Meta.FrameType.BORDER
+            : true;
+          if (win.decorated && hasFrame)
+            this._setMotifHints(win, false);
+        } else {
+          // Native Wayland SSD (e.g. pgtk Emacs): tell Mutter to drop the frame
+          try { win.decorated = false; } catch (_) {}
+        }
       }
+      // CSD apps: GTK CSS injection in gtk.css handles the visual part.
 
       state.hidden = true;
       if (win.has_focus && win.has_focus() && this._onTitlebarHidden)
         this._onTitlebarHidden(win);
-
-      log(`[OneSwitch] titlebar: hid "${win.get_title()}"`);
     } catch (e) {
       log(`[OneSwitch] titlebar: hide failed: ${e}`);
     }
@@ -398,11 +419,17 @@ export class TitleBarManager {
 
   _showDecorations(win, state) {
     try {
-      try { win.set_gtk_hide_titlebar_when_maximized(false); } catch (_) {}
+      const csd = this._isClientDecorated(win);
+      const xid = this._getXid(win);
 
-      if (!this._isClientDecorated(win)) {
-        this._setMotifHints(win, true);
-        try { if (state.wasDecorated !== null) win.decorated = state.wasDecorated; } catch (_) {}
+      if (!csd) {
+        if (xid) {
+          this._setMotifHints(win, true);
+        } else {
+          try {
+            if (state.wasDecorated !== null) win.decorated = state.wasDecorated;
+          } catch (_) {}
+        }
       }
 
       state.hidden = false;

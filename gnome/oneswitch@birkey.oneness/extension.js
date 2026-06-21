@@ -15,9 +15,9 @@ export default class OneSwitchExtension extends Extension {
 
     // Indicator (right side)
     this._indicator = new OneSwitchIndicator(
+      this.path,
       () => this._popup.toggle(),
-      () => this.openPreferences(),
-      () => this._toggleTitlebar());
+      () => this.openPreferences());
     Main.panel.addToStatusArea('oneswitch', this._indicator, 1);
 
     // Title bar feature
@@ -41,10 +41,6 @@ export default class OneSwitchExtension extends Extension {
     this._hotkeyChangedId = this._settings.connect('changed::hotkey', () => this._registerHotkey());
   }
 
-  _toggleTitlebar() {
-    this._settings.set_boolean('hide-titlebar', !this._settings.get_boolean('hide-titlebar'));
-  }
-
   _enableTitlebarFeature() {
     this._titlebar.enable();
 
@@ -53,8 +49,6 @@ export default class OneSwitchExtension extends Extension {
       this._panelTitle.setSettings(this._settings);
       Main.panel.addToStatusArea('oneswitch-panel-title', this._panelTitle, 2, 'left');
     }
-
-    this._indicator.setTitlebarActive(true);
   }
 
   _disableTitlebarFeature() {
@@ -64,8 +58,6 @@ export default class OneSwitchExtension extends Extension {
       this._panelTitle.destroy();
       this._panelTitle = null;
     }
-
-    this._indicator.setTitlebarActive(false);
   }
 
   _registerHotkey() {

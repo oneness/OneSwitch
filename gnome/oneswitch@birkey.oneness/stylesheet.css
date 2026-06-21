@@ -1,3 +1,10 @@
+/* Constrain to a narrow icon-only panel button (override shell's -natural-hpadding) */
+.oneswitch-indicator {
+  -natural-hpadding: 2px;
+  -minimum-hpadding: 2px;
+  padding: 0 2px;
+}
+
 .oneswitch-popup {
   background-color: rgba(30, 30, 32, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.10);
@@ -47,10 +54,10 @@
 }
 
 .oneswitch-panel-title-button {
-  padding: 0 4px;
+  padding: 0 1px;
   border-radius: 4px;
-  min-width: 20px;
-  min-height: 20px;
+  min-width: 12px;
+  min-height: 16px;
 }
 
 .oneswitch-panel-title-button:hover {
@@ -66,5 +73,5 @@
 }
 
 .oneswitch-panel-title-button-icon {
-  icon-size: 14px;
+  icon-size: 12px;
 }
