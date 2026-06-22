@@ -8,7 +8,7 @@ export default class OneSwitchPrefs extends ExtensionPreferences {
     const settings = this.getSettings();
 
     // ---- Hotkey page ----
-    const hotkeyPage = new Adw.PreferencesPage();
+    const hotkeyPage = new Adw.PreferencesPage({ title: 'Hotkey' });
     const hotkeyGroup = new Adw.PreferencesGroup({ title: 'Hotkey' });
     hotkeyPage.add(hotkeyGroup);
 

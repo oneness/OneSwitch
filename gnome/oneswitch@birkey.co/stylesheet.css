@@ -1,8 +1,8 @@
 /* Constrain to a narrow icon-only panel button (override shell's -natural-hpadding) */
 .oneswitch-indicator {
-  -natural-hpadding: 2px;
-  -minimum-hpadding: 2px;
-  padding: 0 2px;
+  -natural-hpadding: 1px;
+  -minimum-hpadding: 1px;
+  padding: 0 1px;
 }
 
 .oneswitch-popup {
