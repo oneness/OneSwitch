@@ -20,6 +20,9 @@ It lists:
 
 Runs as a background accessory app: no Dock icon, just a menu bar item.
 
+> **Linux / GNOME:** a GNOME Shell port (GNOME 47–50, Wayland, NixOS flake install)
+> lives in [`gnome/`](gnome/README.md).
+
 ## Features
 
 - **Recency-sorted** — windows ordered most-recently-used first (tracked via the

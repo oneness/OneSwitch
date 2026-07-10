@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OneSwitch — One Hotkey for Every Window, Tab, and App</title>
+<style>
+  :root {
+    --bg: #fafbfc;
+    --card: #ffffff;
+    --border: #e2e5eb;
+    --text: #1a1d26;
+    --muted: #5c6170;
+    --accent: #3b5bdb;
+    --green: #16a34a;
+    --amber: #d97706;
+    --red: #dc2626;
+    --surface: #f0f2f6;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  .slide {
+    display: none;
+    position: fixed;
+    inset: 0;
+    justify-content: center;
+    align-items: center;
+    padding: 48px;
+  }
+
+  .slide.active { display: flex; }
+
+  .box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 56px 64px;
+    max-width: 780px;
+    width: 100%;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    text-align: center;
+  }
+
+  .label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-size: 56px;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+
+  h2 {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 16px;
+  }
+
+  .big {
+    font-size: 22px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .tagline {
+    font-size: 24px;
+    color: var(--muted);
+    margin-bottom: 0;
+  }
+
+  .mono {
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    font-size: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 32px;
+    text-align: left;
+    color: var(--text);
+    line-height: 1.8;
+    display: inline-block;
+    margin-top: 16px;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .mono .kw  { color: var(--accent); font-weight: 600; }
+  .mono .str { color: var(--green); }
+  .mono .cm  { color: #94a3b8; }
+  .mono .red { color: var(--red); font-weight: 600; }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 20px 0;
+  }
+
+  .flow-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  .flow-box.hi {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .flow-arrow { color: var(--muted); font-size: 18px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+    text-align: left;
+  }
+
+  th {
+    padding: 10px 16px;
+    border-bottom: 2px solid var(--border);
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+
+  td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    text-align: left;
+    margin-top: 20px;
+  }
+
+  .col-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+  }
+
+  .col-box h3 {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  .col-box ul {
+    list-style: none;
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.9;
+  }
+
+  .col-box ul li::before { content: "· "; color: var(--accent); }
+
+  #progress {
+    position: fixed;
+    bottom: 0; left: 0;
+    height: 3px;
+    background: var(--accent);
+    transition: width 0.25s ease;
+    z-index: 100;
+  }
+
+  #controls {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    z-index: 100;
+  }
+
+  #controls button {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  #controls button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #controls button:disabled { opacity: 0.3; cursor: default; background: var(--card); color: var(--muted); border-color: var(--border); }
+
+  #counter {
+    font-size: 13px;
+    color: var(--muted);
+    min-width: 50px;
+    text-align: center;
+  }
+
+  @media (max-width: 720px) {
+    .box { padding: 36px 28px; }
+    h1 { font-size: 40px; }
+    h2 { font-size: 28px; }
+    .big { font-size: 18px; }
+    .tagline { font-size: 20px; }
+    .mono { font-size: 14px; padding: 16px 20px; }
+    .two-col { grid-template-columns: 1fr; }
+    .flow { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+<div id="controls">
+  <button id="prevBtn" onclick="go(-1)">← Prev</button>
+  <span id="counter"></span>
+  <button id="nextBtn" onclick="go(1)">Next →</button>
+</div>
+
+<!-- ═══ 1. Title ═══ -->
+<section class="slide">
+  <div class="box">
+    <h1>OneSwitch</h1>
+    <p class="tagline">One hotkey for every window, browser tab, and app.<br>Press Control+Tab, type, Enter — you're there.</p>
+  </div>
+</section>
+
+<!-- ═══ 2. The Problem ═══ -->
+<section class="slide">
+  <div class="box">
+    <div class="label">why</div>
+    <h2>Alt-Tab isn't enough</h2>
+    <p class="big">Alt-Tab cycles apps, not the browser tab you actually want.<br>Launchers launch, switchers switch — two tools for one intent.<br><br>OneSwitch has one key with one meaning: <strong>take me there</strong> — window, tab, or an app that isn't even running yet.</p>
+  </div>
+</section>
+
+<!-- ═══ 3. The Flow ═══ -->
+<section class="slide">
+  <div class="box">
+    <div class="label">how it works</div>
+    <h2>Three steps</h2>
+    <div class="flow">
+      <div class="flow-box hi">⌃ Tab</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">type to filter</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box hi">Enter</div>
+    </div>
+    <p class="big" style="margin-top: 16px;">A Spotlight-style popup lists everything most-recently-used first.<br>The previous window is preselected, so Control+Tab, Enter<br>bounces between your two most recent windows.</p>
+  </div>
+</section>
+
+<!-- ═══ 4. What It Lists ═══ -->
+<section class="slide">
+  <div class="box">
+    <div class="label">one list</div>
+    <h2>Windows, tabs, apps</h2>
+    <table style="margin-top: 24px;">
+      <tr><td><strong>Windows</strong></td><td>Every app's windows individually, MRU-first, with app icons</td></tr>
+      <tr><td><strong>Chrome tabs</strong></td><td>Listed individually with per-page favicons</td></tr>
+      <tr><td><strong>Firefox tabs</strong></td><td>Listed individually, one keypress to switch</td></tr>
+      <tr><td><strong>Installed apps</strong></td><td>Not running? Appears while searching — Enter launches it</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ 5. Search ═══ -->
+<section class="slide">
+  <div class="box">
+    <div class="label">search</div>
+    <h2>Orderless fuzzy search</h2>
+    <p class="big">Type space-separated tokens in any order — every token must match the title or app name. Results are ranked: title matches, prefix and word-boundary matches, and shorter titles score higher.</p>
+    <div class="mono" style="margin-top: 24px; font-size: 15px;">
+      <span class="kw">mail gmail</span>&nbsp;&nbsp;<span class="cm"># finds "Inbox — Gmail — Google Chrome"</span><br>
+      <span class="kw">code one</span>&nbsp;&nbsp;&nbsp;<span class="cm"># finds "OneSwitch — Visual Studio Code"</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 6. Command Mode ═══ -->
+<section class="slide">
+  <div class="box">
+    <div class="label">command mode</div>
+    <h2>&gt; runs shell commands</h2>
+    <p class="big">Type <code>&gt;</code> and your shell history appears as you type. Enter runs the selected entry; Ctrl+J runs exactly what you typed. Output shows in the panel and lands on your clipboard in full. Esc kills a running command.</p>
+    <div class="mono" style="margin-top: 20px; font-size: 15px;">
+      <span class="kw">&gt;</span> git status<br>
+      <span class="cm">── output (exit 0) ──</span><br>
+      On branch main<br>
+      nothing to commit, working tree clean
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 7. Two Platforms ═══ -->
+<section class="slide">
+  <div class="box">
+    <div class="label">platforms</div>
+    <h2>macOS + GNOME</h2>
+    <div class="two-col">
+      <div class="col-box">
+        <h3>macOS</h3>
+        <ul>
+          <li>Swift + AppKit + SwiftUI</li>
+          <li>Menu bar accessory app</li>
+          <li>Accessibility API windows</li>
+          <li>Pid-addressed Apple Events</li>
+          <li>Carbon global hotkey</li>
+          <li>macOS 13+</li>
+        </ul>
+      </div>
+      <div class="col-box">
+        <h3>Linux</h3>
+        <ul>
+          <li>GNOME Shell extension (GJS)</li>
+          <li>GNOME 47–50, Wayland</li>
+          <li>NixOS flake install</li>
+          <li>WebExtension tab bridge</li>
+          <li>Panel indicator + prefs</li>
+          <li>Title bar management</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 8. macOS Architecture ═══ -->
+<section class="slide">
+  <div class="box">
+    <div class="label">macOS internals</div>
+    <h2>macOS architecture</h2>
+    <table>
+      <tr><th>Component</th><th>Role</th></tr>
+      <tr><td><code>WindowManager</code></td><td>Enumerates windows + tabs, activates the selection</td></tr>
+      <tr><td><code>ChromeScripting</code></td><td>Pid-addressed raw Apple Events to the real Chrome</td></tr>
+      <tr><td><code>WindowHistory</code></td><td>MRU tracking by CGWindowID for recency + Enter toggle</td></tr>
+      <tr><td><code>AppCatalog</code></td><td>Scans app directories for launchable bundles</td></tr>
+      <tr><td><code>FaviconCache</code></td><td>Two-tier favicon cache (memory + disk)</td></tr>
+      <tr><td><code>HotKeyManager</code></td><td>Global Control+Tab hotkey (Carbon)</td></tr>
+      <tr><td><code>SwitcherPanel/View/Model</code></td><td>Popup panel, SwiftUI view, observable state</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ 9. GNOME Architecture ═══ -->
+<section class="slide">
+  <div class="box">
+    <div class="label">linux internals</div>
+    <h2>GNOME architecture</h2>
+    <table>
+      <tr><th>Module</th><th>Role</th></tr>
+      <tr><td><code>extension.js</code></td><td>Hotkey, popup panel, wiring</td></tr>
+      <tr><td><code>lib/model + query</code></td><td>Item list, filtering, ranking (pure, unit-tested)</td></tr>
+      <tr><td><code>lib/history</code></td><td>MRU window ordering, persisted across sessions</td></tr>
+      <tr><td><code>lib/browser</code></td><td>Reads tabs from the native-host Unix socket</td></tr>
+      <tr><td><code>lib/command</code></td><td>Shell-history command mode</td></tr>
+      <tr><td><code>lib/panel-title</code></td><td>Focused window title + buttons in the top panel</td></tr>
+      <tr><td><code>native-host/</code></td><td>GJS bridge: browser native messaging → Unix socket</td></tr>
+      <tr><td><code>webext/</code></td><td>Chrome/Firefox extension streaming the tab list</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ 10. Browser Tab Bridge ═══ -->
+<section class="slide">
+  <div class="box">
+    <div class="label">browser tabs on linux</div>
+    <h2>The tab bridge</h2>
+    <div class="flow">
+      <div class="flow-box">browser tabs</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">WebExtension</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">native host (GJS)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box hi">Unix socket</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">Shell extension</div>
+    </div>
+    <p class="big" style="margin-top: 16px;">GNOME Shell can't see inside browsers, so a WebExtension streams the tab list over native messaging to a tiny GJS host, which exposes it on a socket in <code>$XDG_RUNTIME_DIR</code>. Tabs appear inline with favicons; without the bridge everything else still works.</p>
+  </div>
+</section>
+
+<!-- ═══ 11. Title Bars (GNOME) ═══ -->
+<section class="slide">
+  <div class="box">
+    <div class="label">gnome extra</div>
+    <h2>Title bar management</h2>
+    <p class="big">Optionally hide window title bars on maximized or tiled windows, Unite-style — CSS injection for GTK/Wayland apps, Motif hints for XWayland. The focused window's title (and optional window buttons) moves into the top panel.</p>
+    <table style="margin-top: 24px;">
+      <tr><td><strong>When maximized</strong></td><td>Default — reclaim space only when it matters</td></tr>
+      <tr><td><strong>When tiled or maximized</strong></td><td>Also covers half-tiled windows</td></tr>
+      <tr><td><strong>Always</strong></td><td>No title bars, ever</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ 12. Get Started — macOS ═══ -->
+<section class="slide">
+  <div class="box">
+    <div class="label">get started · macOS</div>
+    <h2>macOS quick start</h2>
+    <div class="mono" style="text-align: left; font-size: 15px;">
+      <span class="cm"># 1. One-time: stable signing identity</span><br>
+      <span class="cm">#    (permission grants survive rebuilds)</span><br>
+      scripts/setup-signing.sh<br><br>
+      <span class="cm"># 2. Build and install</span><br>
+      scripts/build-app.sh<br>
+      cp -R OneSwitch.app /Applications/<br>
+      open /Applications/OneSwitch.app<br><br>
+      <span class="cm"># 3. Grant Accessibility + Automation permissions</span><br><br>
+      <span class="cm"># Press Control+Tab to switch</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 13. Get Started — NixOS ═══ -->
+<section class="slide">
+  <div class="box">
+    <div class="label">get started · nixos</div>
+    <h2>NixOS quick start</h2>
+    <div class="mono" style="text-align: left; font-size: 15px;">
+      <span class="cm"># flake.nix</span><br>
+      oneswitch.url = <span class="str">"github:oneness/OneSwitch"</span>;<br><br>
+      <span class="cm"># configuration.nix</span><br>
+      programs.gnome-shell.extensions = [<br>
+      &nbsp;&nbsp;{ package = oneswitch.packages.$&#123;pkgs.system&#125;.extension; }<br>
+      ];<br><br>
+      <span class="cm"># rebuild, log out and back in</span><br>
+      sudo nixos-rebuild switch
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 14. Source ═══ -->
+<section class="slide">
+  <div class="box">
+    <h2>Open source</h2>
+    <p class="big">Swift for macOS, GJS for GNOME, Nix for packaging.<br>Diagnostics-first design: headless logs, <code>--dump</code> CLI modes,<br>and pure unit-tested core modules.</p>
+    <p class="big" style="margin-top: 24px;"><a href="https://github.com/oneness/OneSwitch" style="color: var(--accent); font-weight: 600;">github.com/oneness/OneSwitch</a></p>
+  </div>
+</section>
+
+<script>
+(function () {
+  const slides = document.querySelectorAll('.slide');
+  const bar    = document.getElementById('progress');
+  const ctr    = document.getElementById('counter');
+  const prevB  = document.getElementById('prevBtn');
+  const nextB  = document.getElementById('nextBtn');
+  let cur = 0;
+
+  function show(i) {
+    cur = i;
+    slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+    bar.style.width = ((i + 1) / slides.length * 100) + '%';
+    ctr.textContent = (i + 1) + ' / ' + slides.length;
+    prevB.disabled = i === 0;
+    nextB.disabled = i === slides.length - 1;
+  }
+
+  window.go = function(d) { show(Math.max(0, Math.min(slides.length - 1, cur + d))); };
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(1); }
+    if (e.key === 'ArrowLeft')                   { e.preventDefault(); go(-1); }
+  });
+
+  show(0);
+})();
+</script>
+</body>
+</html>

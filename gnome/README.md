@@ -60,7 +60,7 @@ gnome-extensions prefs oneswitch@birkey.co
 
 ## Getting started (NixOS flake)
 
-The extension, native host, and WebExtension are all built from the `nix/` flake. Here is a complete example of what a `~/.dotfiles/flake.nix` looks like with OneSwitch wired in:
+The extension, native host, and WebExtension are all built from the flake at the repo root. Here is a complete example of what a `~/.dotfiles/flake.nix` looks like with OneSwitch wired in:
 
 ```nix
 {
@@ -68,7 +68,7 @@ The extension, native host, and WebExtension are all built from the `nix/` flake
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     oneswitch = {
-      url = "github:oneness/OneSwitch?dir=nix";
+      url = "github:oneness/OneSwitch";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -106,6 +106,15 @@ Then in `configuration.nix` (or any module it imports):
 
 After `sudo nixos-rebuild switch`, log out and back in. The extension loads automatically — no manual `gnome-extensions enable` needed when installed this way.
 
+### Upgrading
+
+```sh
+nix flake update oneswitch   # in your dotfiles/flake directory
+sudo nixos-rebuild switch
+```
+
+Then log out and back in — GNOME Shell on Wayland only picks up extension code on session restart.
+
 ### Available flake packages
 
 | Package | What it builds |
@@ -130,10 +139,20 @@ Once both are running a Unix socket appears at `$XDG_RUNTIME_DIR/oneswitch-brows
 
 ## Dev loop (no logout needed)
 
+From `gnome/`, inside the devShell:
+
 ```sh
-make test      # run pure-module unit tests (Node)
-make install   # copy extension + compile schema into ~/.local/share
-make nested    # launch a nested GNOME Shell (Wayland)
+nix develop    # devShell: gjs, glib-compile-schemas, gnome-shell, node, zip, eslint
+
+npm test       # run pure-module unit tests (Node)
+
+# copy extension + compile schema into ~/.local/share
+dest=~/.local/share/gnome-shell/extensions/oneswitch@birkey.co
+rm -rf "$dest" && mkdir -p "$dest" && cp -r oneswitch@birkey.co/. "$dest/"
+glib-compile-schemas "$dest/schemas"
+
+# launch a nested GNOME Shell (Wayland)
+dbus-run-session -- gnome-shell --nested --wayland
 ```
 
 Inside the nested shell:
@@ -142,11 +161,7 @@ Inside the nested shell:
 gnome-extensions enable oneswitch@birkey.co
 ```
 
-Logs: `make logs` (or Alt+F2 → `lg` for Looking Glass).
-
-```sh
-nix develop    # devShell: gjs, glib-compile-schemas, gnome-shell, node, zip, eslint
-```
+Logs: `journalctl --user -f -o cat | grep -i oneswitch` (or Alt+F2 → `lg` for Looking Glass).
 
 ## Extension UUID
 
