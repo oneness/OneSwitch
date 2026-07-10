@@ -62,7 +62,7 @@
       };
 
       devShells.${system}.default = pkgs.mkShell {
-        packages = with pkgs; [ gjs nodejs glib gnome-shell zip nodePackages.eslint ];
+        packages = with pkgs; [ gjs nodejs glib gnome-shell zip eslint ];
       };
     };
 }
