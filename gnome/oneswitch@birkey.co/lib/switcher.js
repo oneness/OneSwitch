@@ -111,6 +111,10 @@ export class SwitcherPopup {
     if (parsed.mode === 'command') {
       this._items = matchHistory(this._history, parsed.value)
         .map((c, i) => ({ id: `cmd-${i}`, kind: 'cmd', title: c, appName: '' }));
+    } else if (parsed.mode === 'web') {
+      this._items = parsed.value
+        ? [{ id: 'web-0', kind: 'web', title: `Search Google for “${parsed.value}”`, appName: '', query: parsed.value }]
+        : [];
     } else {
       this._items = composeResults(this._all, this._apps, parsed.value);
     }
@@ -131,6 +135,8 @@ export class SwitcherPopup {
       } else if (it.kind === 'tab') {
         const path = Favicons.cachedFaviconPath(it.url);
         if (path) row.add_child(new St.Icon({ gicon: Gio.icon_new_for_string(path), icon_size: 22 }));
+      } else if (it.kind === 'web') {
+        row.add_child(new St.Icon({ icon_name: 'system-search-symbolic', icon_size: 22 }));
       }
       const text = new St.BoxLayout({ vertical: true });
       text.add_child(new St.Label({ style_class: 'oneswitch-row-title', text: it.title || '(untitled)' }));
@@ -173,6 +179,16 @@ export class SwitcherPopup {
     if (this._mode === 'command') {
       const cmd = it ? it.title : '';
       if (cmd) this._runCommand(cmd);
+      return;
+    }
+    if (this._mode === 'web') {
+      const query = it ? it.query : '';
+      this.close();
+      if (query) {
+        Gio.AppInfo.launch_default_for_uri(
+          'https://www.google.com/search?q=' + encodeURIComponent(query),
+          global.create_app_launch_context(0, -1));
+      }
       return;
     }
     this.close();

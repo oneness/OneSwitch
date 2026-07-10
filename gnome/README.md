@@ -21,6 +21,10 @@ Chrome and Firefox tabs appear inline with page favicons. Favicons are fetched f
 
 Type `>` to enter command mode. Matching shell history entries appear as you type; Enter runs the selected one, Ctrl+J runs exactly what you typed. Output (stdout + stderr) is shown in the popup and copied to the clipboard. Esc kills a running command.
 
+### Web search mode
+
+Type `?` followed by a query; Enter opens a Google search for it in the default browser.
+
 ### Title bar management
 
 Optionally hide window title bars on maximized/tiled windows (Unite-style):
@@ -53,7 +57,7 @@ gnome-extensions prefs oneswitch@birkey.co
 | **Control+Tab** | Toggle the switcher (previous window preselected) |
 | **Tab** / **Shift+Tab** | Move selection down / up |
 | **↓ / ↑** or **Ctrl+N / Ctrl+P** | Move selection down / up |
-| **Return** | Activate — switch to window, launch app, or run command |
+| **Return** | Activate — switch to window, launch app, run command, or open web search |
 | **Ctrl+J** | In `>` mode — run exactly what is typed |
 | **Esc** | Dismiss (kills a running command first) |
 | Click | Activate that row |

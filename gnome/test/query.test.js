@@ -13,3 +13,11 @@ test('leading > is command mode, > stripped and left-trimmed', () => {
 test('bare > is command mode with empty value', () => {
   assert.deepEqual(parseQuery('>'), { mode: 'command', value: '' });
 });
+
+test('leading ? is web mode, ? stripped and left-trimmed', () => {
+  assert.deepEqual(parseQuery('?  gnome shell docs'), { mode: 'web', value: 'gnome shell docs' });
+});
+
+test('bare ? is web mode with empty value', () => {
+  assert.deepEqual(parseQuery('?'), { mode: 'web', value: '' });
+});
