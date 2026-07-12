@@ -8,8 +8,8 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { filterAndRank, composeResults } from './model.js';
 import { preselectIndex } from './recency.js';
 import { parseQuery } from './query.js';
-import { matchHistory } from './history.js';
-import { readHistory } from './history-io.js';
+import { matchCommands } from './history.js';
+import { readHistory, readPathCommands } from './history-io.js';
 import { CommandRunner } from './command.js';
 import Gio from 'gi://Gio';
 import * as Windows from './windows.js';
@@ -51,10 +51,18 @@ export class SwitcherPopup {
     this._scroll.add_child(this._list);
     this._box.add_child(this._scroll);
 
+    // Command output replaces the list while a command runs, so long output
+    // scrolls in place instead of growing the popup past the screen.
+    this._outputScroll = new St.ScrollView({ overlay_scrollbars: true });
+    this._outputScroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
+    this._outputScroll.set_height(380);
+    this._outputScroll.visible = false;
+    const outputBox = new St.BoxLayout({ vertical: true });
     this._output = new St.Label({ style_class: 'oneswitch-output', text: '' });
     this._output.clutter_text.line_wrap = true;
-    this._output.visible = false;
-    this._box.add_child(this._output);
+    outputBox.add_child(this._output);
+    this._outputScroll.add_child(outputBox);
+    this._box.add_child(this._outputScroll);
 
     this._runner = new CommandRunner();
   }
@@ -67,7 +75,8 @@ export class SwitcherPopup {
     this._all = this._all.concat(this._tabs);
     this._apps = Apps.listApps(Windows.openAppIds());
     this._history = readHistory();
-    this._output.visible = false;
+    this._pathCommands = null; // scanned lazily on first command-mode keystroke
+    this._showOutput(false);
     this._output.set_text('');
     this._mode = 'search';
 
@@ -106,11 +115,13 @@ export class SwitcherPopup {
 
   _refilter() {
     log(`[OneSwitch] _refilter called, text="${this._entry.get_text()}"`);
+    this._showOutput(false);
     const parsed = parseQuery(this._entry.get_text());
     this._mode = parsed.mode;
     if (parsed.mode === 'command') {
-      this._items = matchHistory(this._history, parsed.value)
-        .map((c, i) => ({ id: `cmd-${i}`, kind: 'cmd', title: c, appName: '' }));
+      if (!this._pathCommands) this._pathCommands = readPathCommands();
+      this._items = matchCommands(this._history, this._pathCommands, parsed.value)
+        .map((e, i) => ({ id: `cmd-${i}`, kind: 'cmd', title: e.cmd, appName: '', source: e.source }));
     } else if (parsed.mode === 'web') {
       this._items = parsed.value
         ? [{ id: 'web-0', kind: 'web', title: `Search Google for “${parsed.value}”`, appName: '', query: parsed.value }]
@@ -137,6 +148,8 @@ export class SwitcherPopup {
         if (path) row.add_child(new St.Icon({ gicon: Gio.icon_new_for_string(path), icon_size: 22 }));
       } else if (it.kind === 'web') {
         row.add_child(new St.Icon({ icon_name: 'system-search-symbolic', icon_size: 22 }));
+      } else if (it.kind === 'cmd' && it.source === 'path') {
+        row.add_child(new St.Icon({ icon_name: 'application-x-executable-symbolic', icon_size: 22 }));
       }
       const text = new St.BoxLayout({ vertical: true });
       text.add_child(new St.Label({ style_class: 'oneswitch-row-title', text: it.title || '(untitled)' }));
@@ -207,11 +220,18 @@ export class SwitcherPopup {
   }
 
   _runCommand(cmd) {
-    this._output.visible = true;
+    this._showOutput(true);
     this._output.set_text('running…');
     this._runner.run(cmd, ({ output, code }) => {
       this._output.set_text(`$ ${cmd}\n${output}\n[exit ${code}] (copied to clipboard)`);
     });
+  }
+
+  // Swap between the result list and the command output pane; only one is
+  // visible at a time so output appears directly under the entry.
+  _showOutput(show) {
+    this._outputScroll.visible = show;
+    this._scroll.visible = !show;
   }
 
   _onKey(ev) {

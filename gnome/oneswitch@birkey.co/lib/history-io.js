@@ -1,4 +1,5 @@
 import GLib from 'gi://GLib';
+import Gio from 'gi://Gio';
 import { parseHistory } from './history.js';
 
 export function readHistory() {
@@ -14,4 +15,29 @@ export function readHistory() {
   } catch (_e) {
     return [];
   }
+}
+
+// Executable names on $PATH, deduped and sorted. Commands run via `bash -lc`,
+// whose login PATH can differ from gnome-shell's, but in practice they agree
+// on the system/profile bin dirs.
+export function readPathCommands() {
+  const names = new Set();
+  for (const dir of (GLib.getenv('PATH') || '').split(':')) {
+    if (!dir) continue;
+    let en;
+    try {
+      en = Gio.File.new_for_path(dir).enumerate_children(
+        'standard::name', Gio.FileQueryInfoFlags.NONE, null);
+    } catch (_e) { continue; }
+    let info;
+    while ((info = en.next_file(null))) {
+      const name = info.get_name();
+      if (name.startsWith('.') || names.has(name)) continue; // '.foo-wrapped' Nix internals
+      const p = `${dir}/${name}`;
+      if (GLib.file_test(p, GLib.FileTest.IS_EXECUTABLE) && !GLib.file_test(p, GLib.FileTest.IS_DIR))
+        names.add(name);
+    }
+    en.close(null);
+  }
+  return [...names].sort();
 }

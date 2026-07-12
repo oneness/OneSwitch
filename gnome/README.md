@@ -19,7 +19,7 @@ Chrome and Firefox tabs appear inline with page favicons. Favicons are fetched f
 
 ### Command mode
 
-Type `>` to enter command mode. Matching shell history entries appear as you type; Enter runs the selected one, Ctrl+J runs exactly what you typed. Output (stdout + stderr) is shown in the popup and copied to the clipboard. Esc kills a running command.
+Type `>` to enter command mode. Matching shell history entries appear as you type, followed by matching executables from `$PATH` (marked with a binary icon); Enter runs the selected one, Ctrl+J runs exactly what you typed. Output (stdout + stderr) is shown in the popup and copied to the clipboard. Esc kills a running command.
 
 ### Web search mode
 
@@ -143,17 +143,17 @@ Once both are running a Unix socket appears at `$XDG_RUNTIME_DIR/oneswitch-brows
 
 ## Dev loop (no logout needed)
 
-From `gnome/`, inside the devShell:
+```sh
+gnome/scripts/reload    # copy extension + compile schema into ~/.local/share
+                        # (uses the flake devShell for glib-compile-schemas)
+```
+
+Then, from `gnome/` inside the devShell:
 
 ```sh
 nix develop    # devShell: gjs, glib-compile-schemas, gnome-shell, node, zip, eslint
 
 npm test       # run pure-module unit tests (Node)
-
-# copy extension + compile schema into ~/.local/share
-dest=~/.local/share/gnome-shell/extensions/oneswitch@birkey.co
-rm -rf "$dest" && mkdir -p "$dest" && cp -r oneswitch@birkey.co/. "$dest/"
-glib-compile-schemas "$dest/schemas"
 
 # launch a nested GNOME Shell (Wayland)
 dbus-run-session -- gnome-shell --nested --wayland

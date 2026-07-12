@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Install/refresh the extension into ~/.local/share/gnome-shell/extensions,
+# compiling the settings schema via the repo flake's devShell.
+set -euo pipefail
+
+repo=$(cd "$(dirname "$0")/../.." && pwd)
+dest=$HOME/.local/share/gnome-shell/extensions/oneswitch@birkey.co
+
+rm -rf "$dest"
+mkdir -p "$dest"
+cp -r "$repo/gnome/oneswitch@birkey.co/." "$dest/"
+nix develop "$repo" --command glib-compile-schemas "$dest/schemas"
+
+echo "Installed to $dest"
+echo "Wayland reloads extension code on session restart: log out and back in,"
+echo "or test now in a nested shell: dbus-run-session -- gnome-shell --nested --wayland"
