@@ -5,6 +5,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import { SwitcherPopup } from './lib/switcher.js';
 import { OneSwitchIndicator } from './lib/indicator.js';
+import { Inhibitor } from './lib/inhibitor.js';
 import { TitleBarManager } from './lib/titlebar.js';
 import { PanelTitleWidget } from './lib/panel-title.js';
 
@@ -13,11 +14,17 @@ export default class OneSwitchExtension extends Extension {
     this._settings = this.getSettings();
     this._popup = new SwitcherPopup();
 
+    // Keep awake — holds a session-manager inhibitor
+    this._inhibitor = new Inhibitor(
+      this.uuid,
+      (active) => this._indicator?.setKeepAwake(active));
+
     // Indicator (right side)
     this._indicator = new OneSwitchIndicator(
       this.path,
       () => this._popup.toggle(),
-      () => this.openPreferences());
+      () => this.openPreferences(),
+      (active) => this._inhibitor.setActive(active));
     Main.panel.addToStatusArea('oneswitch', this._indicator, 1);
 
     // Title bar feature
@@ -81,6 +88,7 @@ export default class OneSwitchExtension extends Extension {
     if (this._hideSettingId) { this._settings.disconnect(this._hideSettingId); this._hideSettingId = null; }
     if (this._panelTitle) { this._panelTitle.destroy(); this._panelTitle = null; }
     if (this._titlebar) { this._titlebar.destroy(); this._titlebar = null; }
+    if (this._inhibitor) { this._inhibitor.destroy(); this._inhibitor = null; }
     if (this._indicator) { this._indicator.destroy(); this._indicator = null; }
     if (this._popup) { this._popup.destroy(); this._popup = null; }
     this._settings = null;

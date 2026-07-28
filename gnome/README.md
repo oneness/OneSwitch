@@ -35,9 +35,15 @@ Optionally hide window title bars on maximized/tiled windows (Unite-style):
 
 When title bars are hidden, the focused window's title appears in the top panel, with optional close/minimize/maximize buttons.
 
+### Keep awake
+
+A *Keep awake* switch in the indicator menu stops the machine from suspending, blanking, or locking on idle — a caffeine toggle. It holds an `org.gnome.SessionManager` inhibitor (suspend + idle) for as long as it is on; the panel icon turns amber while it is held.
+
+The inhibitor is released when you switch it off, when the extension is disabled, and automatically if GNOME Shell exits — so it can never get stuck on. The state is not remembered across shell restarts.
+
 ### Panel indicator
 
-A right-panel grid icon opens a menu: *Open switcher*, *Hide/Show title bars*, *Preferences*.
+A right-panel grid icon opens a menu: *Open switcher*, *Keep awake*, *Preferences*.
 
 ### Preferences
 
