@@ -120,7 +120,7 @@ After `sudo nixos-rebuild switch`, log out and back in. The extension loads auto
 
 ```sh
 nix flake update oneswitch   # in your dotfiles/flake directory
-sudo nixos-rebuild switch
+make kpocket                 # or make kbook
 ```
 
 Then log out and back in — GNOME Shell on Wayland only picks up extension code on session restart.

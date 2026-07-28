@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Panel badge, matching the macOS menu-bar icon drawn in
+  Sources/OneSwitch/StatusBarController.swift (makeStatusImage): a rounded tile
+  with a stroked toggle pill and the knob flush to the top (= ON).
+
+  Two differences from macOS, both forced by the GNOME top bar:
+  - Inverted. The Mac bar is light grey, so a near-black tile contrasts there.
+    GNOME's bar is black in every theme, so the tile is light and the switch dark.
+  - The switch is proportionally larger and the tile smaller than the 20pt Mac
+    ratios. At 16px the Mac ratios leave the switch a smudge, and a full-bleed
+    tile outweighs the neighbouring Adwaita glyphs. The knob also needs ~1px of
+    clearance from the pill's inner edge; at the Mac inset the gap is sub-pixel
+    and antialiasing welds the two together, losing the "knob is up" = ON reading.
+
+  Deliberately NOT named *-symbolic.svg: St flattens symbolic icons to a single
+  colour with an injected `!important` stylesheet, which would destroy the two tones.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <rect x="1.40" y="1.40" width="13.20" height="13.20" rx="3.17" fill="#d0d0d5"/>
+  <rect x="4.96" y="3.25" width="6.07" height="9.50" rx="3.04"
+        fill="none" stroke="#141416" stroke-width="1.00"/>
+  <circle cx="8.00" cy="6.28" r="1.44" fill="#141416"/>
+</svg>

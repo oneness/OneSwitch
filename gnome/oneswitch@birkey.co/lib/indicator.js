@@ -10,9 +10,10 @@ class OneSwitchIndicator extends PanelMenu.Button {
     super._init(0.0, 'OneSwitch');
     this.add_style_class_name('oneswitch-indicator');
 
-    const gicon = Gio.icon_new_for_string(extensionPath + '/icons/oneswitch-symbolic.svg');
+    this._giconIdle = Gio.icon_new_for_string(extensionPath + '/icons/oneswitch.svg');
+    this._giconAwake = Gio.icon_new_for_string(extensionPath + '/icons/oneswitch-awake.svg');
     this._icon = new St.Icon({
-      gicon,
+      gicon: this._giconIdle,
       style_class: 'system-status-icon',
       icon_size: 16,
     });
@@ -33,11 +34,11 @@ class OneSwitchIndicator extends PanelMenu.Button {
     this.menu.addMenuItem(prefs);
   }
 
-  // Reflect inhibitor state: menu switch plus a tinted panel icon, so it is
-  // visible without opening the menu.
+  // Reflect inhibitor state: menu switch plus an amber panel icon, so it is
+  // visible without opening the menu. Swapping the icon rather than tinting it via
+  // CSS, because the icon is non-symbolic and so St never applies the style colour.
   setKeepAwake(active) {
     this._keepAwake.setToggleState(active);
-    if (active) this._icon.add_style_class_name('oneswitch-icon-awake');
-    else this._icon.remove_style_class_name('oneswitch-icon-awake');
+    this._icon.gicon = active ? this._giconAwake : this._giconIdle;
   }
 });

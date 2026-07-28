@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  "Keep awake" variant of oneswitch.svg: same geometry, amber tile. Swapped in by
+  lib/indicator.js while a session inhibitor is held. A separate file rather than a
+  CSS tint because the icon is non-symbolic, so St will not recolour it.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <rect x="1.40" y="1.40" width="13.20" height="13.20" rx="3.17" fill="#f6c344"/>
+  <rect x="4.96" y="3.25" width="6.07" height="9.50" rx="3.04"
+        fill="none" stroke="#141416" stroke-width="1.00"/>
+  <circle cx="8.00" cy="6.28" r="1.44" fill="#141416"/>
+</svg>
