@@ -86,8 +86,12 @@ export class SwitcherPopup {
     this._items = composeResults(this._all, this._apps, '');
     this._selected = preselectIndex(this._items, focused);
     log(`[OneSwitch] open: focusedId=${focused} preselect=${this._selected} item="${this._items[this._selected]?.title}" item0="${this._items[0]?.title}" item1="${this._items[1]?.title}"`);
-    this._render();
+
+    // Show the popup before building the rows, and re-apply the highlight once the
+    // rows are mapped and the layout has run (below). The highlight needs a mapped,
+    // allocated, repainted actor to actually appear — see _highlight().
     this._box.visible = true;
+    this._render();
 
     // global.stage has no layout manager — set_position sticks.
     GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
@@ -96,6 +100,7 @@ export class SwitcherPopup {
         Math.round(monitor.x + (monitor.width  - this._box.width)  / 2),
         Math.round(monitor.y + (monitor.height - this._box.height) / 2),
       );
+      this._highlight();   // rows are mapped/allocated now — make the highlight stick
       return GLib.SOURCE_REMOVE;
     });
 
@@ -167,17 +172,34 @@ export class SwitcherPopup {
       if (i === this._selected) r.add_style_class_name('selected');
       else r.remove_style_class_name('selected');
     });
+
     const row = this._rows[this._selected];
-    if (row) {
-      const adj = this._scroll.vscroll ? this._scroll.vscroll.adjustment
-                                       : this._scroll.get_vadjustment();
-      if (adj) {
-        const top = adj.value, bottom = top + adj.page_size;
-        const ry = row.allocation.y1;
-        if (ry < top) adj.value = ry;
-        else if (ry + row.height > bottom) adj.value = ry + row.height - adj.page_size;
+    const adj = this._scroll.vscroll ? this._scroll.vscroll.adjustment
+                                     : this._scroll.get_vadjustment();
+
+    let info = `sel=${this._selected}/${this._rows.length}`;
+    if (row) info += ` y=${row.allocation.y1}..${row.allocation.y2} cls=${row.has_style_class_name('selected')}`;
+    info += adj ? ` adj(v=${adj.value} u=${adj.upper} p=${adj.page_size})` : ' adj=nil';
+    log(`[OneSwitch] _highlight ${info}`);
+
+    // Scroll the selected row into view, but only once the ScrollView has a real
+    // viewport (page_size > 0). Before layout page_size is 0, which made the old
+    // `ry + h - page_size` branch jump the list so the selected row sat off-screen.
+    if (row && adj && adj.page_size > 0) {
+      const ry = row.allocation.y1;
+      const rh = row.allocation.y2 - row.allocation.y1;
+      if (isFinite(ry) && isFinite(rh)) {
+        if (ry < adj.value) adj.value = ry;
+        else if (ry + rh > adj.value + adj.page_size) adj.value = ry + rh - adj.page_size;
       }
     }
+
+    // St only invalidates geometry/paint-volume on a style change — it does not
+    // queue a redraw for a pure class swap (same geometry), so the highlight can go
+    // unpainted until something else forces a repaint. Typing forced one via the
+    // filtered relayout; a plain summon didn't. Force it here so the selection
+    // always shows.
+    this._rows.forEach(r => r.queue_redraw());
   }
 
   _move(delta) {
