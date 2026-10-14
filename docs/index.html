@@ -365,7 +365,6 @@
           <li>GNOME Shell extension (GJS)</li>
           <li>GNOME 47–50, Wayland</li>
           <li>NixOS flake install</li>
-          <li>WebExtension tab bridge</li>
           <li>Panel indicator + prefs</li>
           <li>Title bar management</li>
         </ul>
@@ -374,64 +373,7 @@
   </div>
 </section>
 
-<!-- ═══ 8. macOS Architecture ═══ -->
-<section class="slide">
-  <div class="box">
-    <div class="label">macOS internals</div>
-    <h2>macOS architecture</h2>
-    <table>
-      <tr><th>Component</th><th>Role</th></tr>
-      <tr><td><code>WindowManager</code></td><td>Enumerates windows + tabs, activates the selection</td></tr>
-      <tr><td><code>ChromeScripting</code></td><td>Pid-addressed raw Apple Events to the real Chrome</td></tr>
-      <tr><td><code>WindowHistory</code></td><td>MRU tracking by CGWindowID for recency + Enter toggle</td></tr>
-      <tr><td><code>AppCatalog</code></td><td>Scans app directories for launchable bundles</td></tr>
-      <tr><td><code>FaviconCache</code></td><td>Two-tier favicon cache (memory + disk)</td></tr>
-      <tr><td><code>HotKeyManager</code></td><td>Global Control+Tab hotkey (Carbon)</td></tr>
-      <tr><td><code>SwitcherPanel/View/Model</code></td><td>Popup panel, SwiftUI view, observable state</td></tr>
-    </table>
-  </div>
-</section>
-
-<!-- ═══ 9. GNOME Architecture ═══ -->
-<section class="slide">
-  <div class="box">
-    <div class="label">linux internals</div>
-    <h2>GNOME architecture</h2>
-    <table>
-      <tr><th>Module</th><th>Role</th></tr>
-      <tr><td><code>extension.js</code></td><td>Hotkey, popup panel, wiring</td></tr>
-      <tr><td><code>lib/model + query</code></td><td>Item list, filtering, ranking (pure, unit-tested)</td></tr>
-      <tr><td><code>lib/history</code></td><td>MRU window ordering, persisted across sessions</td></tr>
-      <tr><td><code>lib/browser</code></td><td>Reads tabs from the native-host Unix socket</td></tr>
-      <tr><td><code>lib/command</code></td><td>Shell-history command mode</td></tr>
-      <tr><td><code>lib/panel-title</code></td><td>Focused window title + buttons in the top panel</td></tr>
-      <tr><td><code>native-host/</code></td><td>GJS bridge: browser native messaging → Unix socket</td></tr>
-      <tr><td><code>webext/</code></td><td>Chrome/Firefox extension streaming the tab list</td></tr>
-    </table>
-  </div>
-</section>
-
-<!-- ═══ 10. Browser Tab Bridge ═══ -->
-<section class="slide">
-  <div class="box">
-    <div class="label">browser tabs on linux</div>
-    <h2>The tab bridge</h2>
-    <div class="flow">
-      <div class="flow-box">browser tabs</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box">WebExtension</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box">native host (GJS)</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box hi">Unix socket</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box">Shell extension</div>
-    </div>
-    <p class="big" style="margin-top: 16px;">GNOME Shell can't see inside browsers, so a WebExtension streams the tab list over native messaging to a tiny GJS host, which exposes it on a socket in <code>$XDG_RUNTIME_DIR</code>. Tabs appear inline with favicons; without the bridge everything else still works.</p>
-  </div>
-</section>
-
-<!-- ═══ 11. Title Bars (GNOME) ═══ -->
+<!-- ═══ 8. Title Bars (GNOME) ═══ -->
 <section class="slide">
   <div class="box">
     <div class="label">gnome extra</div>
@@ -445,7 +387,7 @@
   </div>
 </section>
 
-<!-- ═══ 12. Get Started — macOS ═══ -->
+<!-- ═══ 9. Get Started — macOS ═══ -->
 <section class="slide">
   <div class="box">
     <div class="label">get started · macOS</div>
@@ -464,7 +406,7 @@
   </div>
 </section>
 
-<!-- ═══ 13. Get Started — NixOS ═══ -->
+<!-- ═══ 10. Get Started — NixOS ═══ -->
 <section class="slide">
   <div class="box">
     <div class="label">get started · nixos</div>
@@ -482,7 +424,7 @@
   </div>
 </section>
 
-<!-- ═══ 14. Source ═══ -->
+<!-- ═══ 11. Source ═══ -->
 <section class="slide">
   <div class="box">
     <h2>Open source</h2>

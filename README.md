@@ -26,6 +26,9 @@ Runs as a background accessory app: no Dock icon, just a menu bar item.
 - **App launcher** — Just type and enter.
 - **Command mode** — Enter `>` and type to select from history.
 - **Search mode** — Enter `?` and type search query.
+- **Title bar management** (GNOME) — optionally hide window title bars on maximized
+  or tiled windows, Unite-style; the focused window's title (and optional window
+  buttons) moves into the top panel.
 
 
 ### Keys
