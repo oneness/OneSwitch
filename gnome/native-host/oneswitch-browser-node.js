@@ -21,14 +21,36 @@ const cacheDir = path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(),
 
 let latestTabs = [];
 
-// Save data-URL favicons to disk so the GNOME extension can display them.
-function cacheFavicons(tabs) {
+// Favicons are pulled, not pushed: the webext no longer ships favIconUrl with
+// every snapshot (image data was 99% of it). We ask for the sites we do not
+// have yet, once each, and write the data: URLs to disk for the Shell extension.
+const askedFavicons = new Set();
+
+function hostOf(url) {
+  const m = /^https?:\/\/([^/:]+)/.exec(url || '');
+  return m ? m[1] : null;
+}
+
+function requestMissingFavicons() {
+  const want = [];
+  for (const t of latestTabs) {
+    const host = hostOf(t.url);
+    if (!host || askedFavicons.has(host)) continue;
+    askedFavicons.add(host);
+    let cached = false;
+    try { cached = fs.existsSync(path.join(cacheDir, host)); } catch (_) {}
+    if (!cached) want.push(host);
+  }
+  if (want.length) toBrowser({ type: 'want-favicons', hosts: want });
+}
+
+function writeFavicons(items) {
+  if (!Array.isArray(items) || items.length === 0) return;
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch (_) {}
-  for (const t of tabs) {
-    if (!t.url || !t.favIconUrl) continue;
-    const host = /^https?:\/\/([^/:]+)/.exec(t.url)?.[1];
-    if (!host) continue;
-    const m = /^data:image\/[^;]+;base64,(.+)$/.exec(t.favIconUrl);
+  for (const it of items) {
+    const host = it && it.host;
+    if (!host || !/^[A-Za-z0-9._-]+$/.test(host)) continue;   // becomes a filename
+    const m = /^data:image\/[^;]+;base64,(.+)$/.exec((it && it.dataUrl) || '');
     if (!m) continue;
     try { fs.writeFileSync(path.join(cacheDir, host), Buffer.from(m[1], 'base64')); } catch (_) {}
   }
@@ -66,7 +88,9 @@ process.stdin.on('data', chunk => {
   for (const m of messages) {
     if (m.type === 'tabs') {
       latestTabs = m.tabs;
-      cacheFavicons(m.tabs);
+      requestMissingFavicons();
+    } else if (m.type === 'favicons') {
+      writeFavicons(m.items);
     }
   }
 });

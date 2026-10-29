@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { filterAndRank, composeResults } from '../oneswitch@birkey.co/lib/model.js';
+import { filterAndRank, composeResults, dropTabbedBrowserWindows, browserOfWindow } from '../oneswitch@birkey.co/lib/model.js';
 
 const items = [
   { id: 1, title: 'Inbox — Gmail', appName: 'Firefox' },
@@ -57,4 +57,50 @@ test('query appends matching apps after matching windows', () => {
 test('apps that do not match are excluded', () => {
   const r = composeResults(wins, apps, 'calc').map(i => i.id);
   assert.deepEqual(r, ['a1']);
+});
+
+// --- browser windows vs their tabs -----------------------------------------
+// A browser window's title is the active tab's title plus a suffix, so listing
+// both makes the active tab look duplicated. The window is dropped only when we
+// actually have tabs for that browser.
+
+const firefoxWindow = { id: 'win-1', kind: 'window', title: 'Inbox — Gmail — Kasim — Firefox Developer Edition',
+                        appName: 'Firefox Developer Edition', appId: 'firefox-devedition.desktop', windowId: 1 };
+const terminalWindow = { id: 'win-2', kind: 'window', title: 'emacs', appName: 'Alacritty', appId: 'Alacritty.desktop', windowId: 2 };
+const chromeWindow = { id: 'win-3', kind: 'window', title: 'x — Google Chrome', appName: 'Google Chrome', appId: 'google-chrome.desktop', windowId: 3 };
+const ffTab = { id: 'tab-firefox-2', kind: 'tab', title: 'Inbox — Gmail', browser: 'firefox', active: true };
+
+test('browserOfWindow matches the app name or the desktop id', () => {
+  assert.equal(browserOfWindow(firefoxWindow), 'firefox');
+  assert.equal(browserOfWindow(chromeWindow), 'chrome');
+  assert.equal(browserOfWindow(terminalWindow), null);
+  assert.equal(browserOfWindow({ appName: 'Firefox', appId: '' }), 'firefox');
+  assert.equal(browserOfWindow({ appName: 'Chromium', appId: '' }), 'chrome');
+  assert.equal(browserOfWindow(null), null);
+});
+
+test('drops the browser window when its tabs are listed', () => {
+  const kept = dropTabbedBrowserWindows([firefoxWindow, terminalWindow], [ffTab]);
+  assert.deepEqual(kept.map(w => w.id), ['win-2']);
+});
+
+test('keeps the browser window when no tabs were enumerated for it', () => {
+  const kept = dropTabbedBrowserWindows([firefoxWindow, terminalWindow], []);
+  assert.deepEqual(kept.map(w => w.id), ['win-1', 'win-2']);
+});
+
+test('drops only the browser that has tabs', () => {
+  const kept = dropTabbedBrowserWindows([firefoxWindow, chromeWindow, terminalWindow], [ffTab]);
+  assert.deepEqual(kept.map(w => w.id), ['win-3', 'win-2']);
+});
+
+test('drops every window of a covered browser (tabs stand for all of them)', () => {
+  const second = { ...firefoxWindow, id: 'win-9', windowId: 9 };
+  const kept = dropTabbedBrowserWindows([firefoxWindow, second, terminalWindow], [ffTab]);
+  assert.deepEqual(kept.map(w => w.id), ['win-2']);
+});
+
+test('a tab without a browser field never drops anything', () => {
+  const kept = dropTabbedBrowserWindows([firefoxWindow], [{ id: 'tab-x', kind: 'tab' }]);
+  assert.deepEqual(kept.map(w => w.id), ['win-1']);
 });

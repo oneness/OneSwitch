@@ -5,8 +5,8 @@ import Shell from 'gi://Shell';
 import GObject from 'gi://GObject';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import { filterAndRank, composeResults } from './model.js';
-import { preselectIndex } from './recency.js';
+import { composeResults, dropTabbedBrowserWindows } from './model.js';
+import { preselectIndexWithTabs } from './recency.js';
 import { parseQuery } from './query.js';
 import { matchCommands } from './history.js';
 import { readHistory, readPathCommands } from './history-io.js';
@@ -16,6 +16,11 @@ import * as Windows from './windows.js';
 import * as Apps from './apps.js';
 import * as Browser from './browser.js';
 import * as Favicons from './favicons.js';
+
+// Tells you which build the Shell actually has in memory: modules are imported
+// once per session, so after editing extension code this line only reappears
+// after a real reload (log out/in on Wayland).
+log('[OneSwitch] switcher module loaded (build with window/tab dedupe)');
 
 export class SwitcherPopup {
   constructor() {
@@ -70,9 +75,17 @@ export class SwitcherPopup {
   open() {
     if (this._box.visible) return;
     const focused = Windows.focusedWindowId();
-    this._all = Windows.listWindows();
-    this._tabs = Browser.listTabs();
-    this._all = this._all.concat(this._tabs);
+    const wins = Windows.listWindows();
+    const tabs = Browser.listTabs();
+    // Pick the target on the *full* list first: a browser window is still "the
+    // previous window" even though we no longer list it (its tabs stand for it).
+    // Then drop the tabbed browser windows and translate that target to the
+    // browser's active tab, so Ctrl+Tab still bounces back where you were.
+    const full = wins.concat(tabs);
+    const kept = dropTabbedBrowserWindows(wins, tabs);
+    const selected = preselectIndexWithTabs(full, kept, tabs, focused);
+    this._all = kept.concat(tabs);
+    this._tabs = tabs;
     this._apps = Apps.listApps(Windows.openAppIds());
     this._history = readHistory();
     this._pathCommands = null; // scanned lazily on first command-mode keystroke
@@ -84,8 +97,10 @@ export class SwitcherPopup {
     this._entry.set_text('');
     this._opening = false;
     this._items = composeResults(this._all, this._apps, '');
-    this._selected = preselectIndex(this._items, focused);
-    log(`[OneSwitch] open: focusedId=${focused} preselect=${this._selected} item="${this._items[this._selected]?.title}" item0="${this._items[0]?.title}" item1="${this._items[1]?.title}"`);
+    this._selected = Math.max(0, Math.min(selected, this._items.length - 1));
+    log(`[OneSwitch] open: focusedId=${focused} preselect=${this._selected} ` +
+        `windows=${this._all.length - this._tabs.length} tabs=${this._tabs.length} ` +
+        `item="${this._items[this._selected]?.title}" item0="${this._items[0]?.title}" item1="${this._items[1]?.title}"`);
 
     // Show the popup before building the rows, and re-apply the highlight once the
     // rows are mapped and the layout has run (below). The highlight needs a mapped,

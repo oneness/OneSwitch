@@ -15,6 +15,7 @@ export function listWindows() {
       kind: 'window',
       title: w.get_title() || '',
       appName: app ? app.get_name() : '',
+      appId: app ? app.get_id() : '',
       windowId: w.get_id(),
       metaWindow: w,
       app,

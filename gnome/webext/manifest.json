@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "OneSwitch Bridge",
-  "version": "1.2",
+  "version": "1.3",
   "description": "Reports tabs to the OneSwitch GNOME extension and switches on request.",
   "permissions": ["tabs", "nativeMessaging"],
   "background": { "scripts": ["background.js"], "persistent": true },
