@@ -34,7 +34,8 @@
           buildInputs = [ pkgs.gjs ];
           installPhase = ''
             mkdir -p $out/libexec/oneswitch
-            cp native-host/oneswitch-browser.js native-host/framing.js $out/libexec/oneswitch/
+            cp native-host/oneswitch-browser.js native-host/framing.js \
+               native-host/favicon-format.js $out/libexec/oneswitch/
             chmod +x $out/libexec/oneswitch/oneswitch-browser.js
             makeWrapper ${pkgs.gjs}/bin/gjs $out/bin/oneswitch-browser \
               --add-flags "-m $out/libexec/oneswitch/oneswitch-browser.js"

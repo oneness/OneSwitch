@@ -11,6 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // framing.js uses Buffer natively under Node.
 const { encodeMessage, decodeMessages } = await import('./framing.js');
+const { normalizeFavicon } = await import('./favicon-format.js');
 
 const arg = (process.argv[2] || '') + (process.argv[3] || '') + (process.argv[4] || '');
 const browser = arg.includes('firefox') || arg.includes('@birkey') ? 'firefox' : 'chrome';
@@ -52,11 +53,32 @@ function writeFavicons(items) {
     if (!host || !/^[A-Za-z0-9._-]+$/.test(host)) continue;   // becomes a filename
     const m = /^data:image\/[^;]+;base64,(.+)$/.exec((it && it.dataUrl) || '');
     if (!m) continue;
-    try { fs.writeFileSync(path.join(cacheDir, host), Buffer.from(m[1], 'base64')); } catch (_) {}
+    // .ico payloads are rewritten as their PNG frame: the Shell's image loader
+    // cannot read PNG-compressed ICO frames (see favicon-format.js).
+    const bytes = normalizeFavicon(Buffer.from(m[1], 'base64'));
+    if (!bytes) continue;
+    try { fs.writeFileSync(path.join(cacheDir, host), bytes); } catch (_) {}
+  }
+}
+
+// Icons cached before the ICO→PNG rewrite would never be re-fetched (webext is
+// only asked for hosts we lack), so fix them in place on startup.
+function migrateCachedFavicons() {
+  let names = [];
+  try { names = fs.readdirSync(cacheDir); } catch (_) { return; }
+  for (const name of names) {
+    const file = path.join(cacheDir, name);
+    try {
+      const bytes = fs.readFileSync(file);
+      const png = normalizeFavicon(bytes);
+      if (!png || png === bytes) continue;   // not an ICO, or nothing to rewrite
+      fs.writeFileSync(file, png);
+    } catch (_) {}
   }
 }
 
 // --- Unix socket server for the GNOME Shell extension ---
+migrateCachedFavicons();
 try { fs.unlinkSync(sockPath); } catch (_) {}
 const server = net.createServer(conn => {
   let data = '';

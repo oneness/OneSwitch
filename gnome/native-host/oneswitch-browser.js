@@ -29,6 +29,7 @@ function writeLE(v, off) {
 }
 
 const { encodeMessage, decodeMessages } = await import('./framing.js');
+const { normalizeFavicon } = await import('./favicon-format.js');
 
 // Determine which browser launched us from the manifest name passed in argv.
 const browser = (ARGV[0] || '').includes('firefox') ? 'firefox' : 'chrome';
@@ -126,20 +127,52 @@ function writeFavicons(items) {
   if (!Array.isArray(items) || items.length === 0) return;
   try { GLib.mkdir_with_parents(favCacheDir, 0o755); } catch (_e) {}
   let wrote = 0;
+  let unusable = 0;
   for (const it of items) {
     const host = it && it.host;
     // host becomes a filename: keep it to what a hostname can contain.
     if (!host || !/^[A-Za-z0-9._-]+$/.test(host)) continue;
     const m = /^data:image\/[^;]+;base64,(.+)$/.exec((it && it.dataUrl) || '');
     if (!m) continue;
+    // .ico payloads are rewritten as their PNG frame here: the Shell's image
+    // loader cannot read PNG-compressed ICO frames (see favicon-format.js).
+    const bytes = normalizeFavicon(GLib.base64_decode(m[1]));
+    if (!bytes) { unusable++; continue; }
     try {
-      if (GLib.file_set_contents(`${favCacheDir}/${host}`, GLib.base64_decode(m[1]))) wrote++;
+      if (GLib.file_set_contents(`${favCacheDir}/${host}`, bytes)) wrote++;
     } catch (_e) {}
   }
-  dlog(`favicons: wrote ${wrote}/${items.length} icon(s) to ${favCacheDir}`);
+  dlog(`favicons: wrote ${wrote}/${items.length} icon(s) to ${favCacheDir}` +
+       (unusable ? ` (${unusable} unusable payload(s) skipped)` : ''));
+}
+
+// Icons cached before the ICO→PNG rewrite are still on disk and would never be
+// re-fetched (the webext is only asked for hosts we lack), so fix them in place.
+function migrateCachedFavicons() {
+  let dir;
+  try {
+    dir = Gio.File.new_for_path(favCacheDir)
+      .enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+  } catch (_e) {
+    return;   // no cache dir yet
+  }
+  let rewrote = 0;
+  let info;
+  while ((info = dir.next_file(null)) !== null) {
+    const path = `${favCacheDir}/${info.get_name()}`;
+    try {
+      const [, bytes] = GLib.file_get_contents(path);
+      const png = normalizeFavicon(bytes);
+      if (!png || png === bytes) continue;   // not an ICO, or nothing to rewrite
+      if (GLib.file_set_contents(path, png)) rewrote++;
+    } catch (_e) {}
+  }
+  try { dir.close(null); } catch (_e) {}
+  if (rewrote) dlog(`favicons: rewrote ${rewrote} cached .ico icon(s) as PNG`);
 }
 
 dlog(`start: browser=${browser} sock=${sockPath} argv=${JSON.stringify(ARGV)}`);
+migrateCachedFavicons();
 
 // --- read framed stdin from the browser ---
 const stdinStream = new Gio.DataInputStream({

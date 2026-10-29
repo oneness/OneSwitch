@@ -15,7 +15,7 @@ Press **Control+Tab** (configurable) to open a centered popup. Type to filter, n
 
 ### Browser tabs
 
-Chrome and Firefox tabs appear inline with page favicons. Favicons are fetched from DuckDuckGo's favicon service and cached on disk. Requires the WebExtension and native host bridge (see [Browser tabs setup](#browser-tabs-setup)).
+Chrome and Firefox tabs appear inline with page favicons. Icons come from the browser (`favIconUrl`), are cached on disk per host, and are normalised at ingest by the native host: sites that serve `.ico` files get their largest embedded PNG frame extracted (`native-host/favicon-format.js`), because gdk-pixbuf's ICO loader rejects the PNG-compressed frames modern `.ico` files use. Sites with no usable icon at all get a generic globe, so a row never loses its icon slot. Requires the WebExtension and native host bridge (see [Browser tabs setup](#browser-tabs-setup)).
 
 ### Command mode
 
@@ -24,6 +24,14 @@ Type `>` to enter command mode. Matching shell history entries appear as you typ
 ### Web search mode
 
 Type `?` followed by a query; Enter opens a Google search for it in the default browser.
+
+### Light & dark
+
+The popup follows the system appearance — light on GNOME's light style, dark on the dark one — and re-paints the moment you flip *Settings → Appearance*, even while it is open. The shell chooses its own stylesheet from `org.gnome.desktop.interface`'s `color-scheme`, so the extension mirrors that setting (`lib/theme.js`) and swaps the `.oneswitch-light` overrides in `stylesheet.css`.
+
+Every popup colour is set explicitly per palette rather than inherited — row titles, subtitles, command output and the search entry — because a label inside a light popup must not keep the shell's white foreground, and the entry must not keep the shell's dark bar. The entry's focus ring is re-declared `!important` for the light palette, since the shell's own ring rule is important too and tuned for a dark popup. The panel title label is the exception: it sits inside a panel button, so it inherits the panel's theme colour instead of hard-coding white, and its buttons use neutral grey hover overlays so they read the same on either panel.
+
+Note that GNOME Shell itself stays dark for `color-scheme 'default'` (the user session mode resolves to the dark variant unless the preference is `prefer-light`), so a light popup is a deliberate choice to match the *GTK* appearance, not the shell chrome.
 
 ### Title bar management
 

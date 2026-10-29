@@ -16,6 +16,7 @@ import * as Windows from './windows.js';
 import * as Apps from './apps.js';
 import * as Browser from './browser.js';
 import * as Favicons from './favicons.js';
+import { DESKTOP_INTERFACE_SCHEMA, COLOR_SCHEME_KEY, applyPalette } from './theme.js';
 
 // Tells you which build the Shell actually has in memory: modules are imported
 // once per session, so after editing extension code this line only reappears
@@ -40,6 +41,14 @@ export class SwitcherPopup {
     });
     // Add to global.stage so no layout manager can stretch or reposition it.
     global.stage.insert_child_above(this._box, null);
+
+    // Match the shell's own light/dark choice, and keep matching it when the user
+    // flips Appearance in Settings while we are running.
+    this._ifaceSettings = new Gio.Settings({ schema_id: DESKTOP_INTERFACE_SCHEMA });
+    applyPalette(this._box, this._ifaceSettings.get_string(COLOR_SCHEME_KEY));
+    this._schemeId = this._ifaceSettings.connect(`changed::${COLOR_SCHEME_KEY}`, () => {
+      applyPalette(this._box, this._ifaceSettings.get_string(COLOR_SCHEME_KEY));
+    });
 
     this._entry = new St.Entry({ style_class: 'oneswitch-entry', can_focus: true });
     this._entry.clutter_text.connect('text-changed', () => { if (!this._opening) this._refilter(); });
@@ -164,8 +173,13 @@ export class SwitcherPopup {
       } else if (it.kind === 'app' && it.gicon) {
         row.add_child(new St.Icon({ gicon: it.gicon, icon_size: 22 }));
       } else if (it.kind === 'tab') {
+        // No usable favicon is normal: sites ship .ico files the Shell cannot
+        // paint, and some ship nothing at all. A generic globe keeps the row
+        // aligned instead of dropping the icon slot.
         const path = Favicons.cachedFaviconPath(it.url);
-        if (path) row.add_child(new St.Icon({ gicon: Gio.icon_new_for_string(path), icon_size: 22 }));
+        row.add_child(new St.Icon(path
+          ? { gicon: Gio.icon_new_for_string(path), icon_size: 22 }
+          : { icon_name: 'web-browser-symbolic', icon_size: 22 }));
       } else if (it.kind === 'web') {
         row.add_child(new St.Icon({ icon_name: 'system-search-symbolic', icon_size: 22 }));
       } else if (it.kind === 'cmd' && it.source === 'path') {
@@ -297,6 +311,11 @@ export class SwitcherPopup {
 
   destroy() {
     this.close();
+    if (this._schemeId) {
+      this._ifaceSettings.disconnect(this._schemeId);
+      this._schemeId = null;
+    }
+    this._ifaceSettings = null;
     if (this._box) { this._box.destroy(); this._box = null; }
   }
 }

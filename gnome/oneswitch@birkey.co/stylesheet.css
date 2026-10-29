@@ -5,18 +5,46 @@
   padding: 0 1px;
 }
 
+/* The popup is built outside the shell's themed actor tree, so its palette comes
+   from here. Dark is the default; `.oneswitch-light` (added by lib/theme.js when
+   org.gnome.desktop.interface color-scheme is light) overrides every colour that
+   would otherwise vanish on a light background. Foreground is set explicitly
+   rather than inherited: what a label inherits depends on the shell theme in use,
+   and a light popup with leftover white text is unreadable. */
 .oneswitch-popup {
   background-color: rgba(30, 30, 32, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.95);
   border-radius: 14px;
   padding: 10px;
   width: 640px;
+}
+.oneswitch-light.oneswitch-popup {
+  background-color: rgba(250, 250, 251, 0.97);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: rgba(34, 34, 38, 0.95);
 }
 .oneswitch-entry {
   font-size: 15px;
   padding: 8px 10px;
   margin-bottom: 8px;
   border-radius: 8px;
+}
+/* In the dark palette the entry keeps the shell theme's own StEntry colours. In
+   the light one those would leave a dark bar in an otherwise light popup, so paint
+   it in the light theme's entry greys. The focused background and the accent focus
+   ring come from the theme too, and both are tuned for a dark popup — hence the
+   `!important`: the theme's own ring rule is marked important. */
+.oneswitch-light .oneswitch-entry {
+  background-color: rgba(0, 0, 0, 0.07);
+  color: rgba(34, 34, 38, 0.95);
+}
+.oneswitch-light .oneswitch-entry:hover {
+  background-color: rgba(0, 0, 0, 0.10);
+}
+.oneswitch-light .oneswitch-entry:focus {
+  background-color: rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 0 0 2px st-transparentize(-st-accent-color, 0.2) !important;
 }
 .oneswitch-list { spacing: 2px; }
 .oneswitch-row {
@@ -28,8 +56,10 @@
 .oneswitch-row.selected {
   background-color: rgba(120, 150, 255, 0.35);
 }
-.oneswitch-row-title { font-size: 14px; }
+.oneswitch-row-title { font-size: 14px; color: rgba(255, 255, 255, 0.95); }
+.oneswitch-light .oneswitch-row-title { color: rgba(34, 34, 38, 0.95); }
 .oneswitch-row-sub { font-size: 11px; color: rgba(255,255,255,0.55); }
+.oneswitch-light .oneswitch-row-sub { color: rgba(34, 34, 38, 0.60); }
 .oneswitch-output {
   font-family: monospace;
   font-size: 12px;
@@ -39,14 +69,36 @@
   background-color: rgba(0, 0, 0, 0.35);
   color: rgba(255, 255, 255, 0.9);
 }
+.oneswitch-light .oneswitch-output {
+  background-color: rgba(0, 0, 0, 0.06);
+  color: rgba(34, 34, 38, 0.9);
+}
+
+/* The overlay scrollbars are drawn from the shell theme as well: the dark
+   variant's handle (#727275) reads as a heavy stripe on a light popup, so use the
+   greys the light theme uses for its own handles. */
+.oneswitch-light StScrollBar > .vhandle,
+.oneswitch-light StScrollBar > .hhandle {
+  background-color: #b9b9bb;
+}
+.oneswitch-light StScrollBar > .vhandle:hover,
+.oneswitch-light StScrollBar > .hhandle:hover {
+  background-color: #8e8e91;
+}
+.oneswitch-light StScrollBar > .vhandle:active,
+.oneswitch-light StScrollBar > .hhandle:active {
+  background-color: #a4a4a6;
+}
 
 /* --- Panel Title Widget (hide-titlebar feature) --- */
 
+/* No colour here on purpose: the label sits inside a PanelMenu.Button, so it
+   inherits whatever foreground the shell theme gives `#panel .panel-button` —
+   white on dark, near-black on light. */
 .oneswitch-panel-title-label {
   font-weight: 500;
   font-size: 11.5px;
   padding: 0 4px;
-  color: rgba(255, 255, 255, 0.85);
 }
 
 .oneswitch-panel-title-buttons {
@@ -60,12 +112,14 @@
   min-height: 16px;
 }
 
+/* Neutral grey overlays rather than white ones, so the hover and pressed states
+   read the same on the dark and on the light panel. */
 .oneswitch-panel-title-button:hover {
-  background-color: rgba(255, 255, 255, 0.12);
+  background-color: rgba(128, 128, 128, 0.18);
 }
 
 .oneswitch-panel-title-button:active {
-  background-color: rgba(255, 255, 255, 0.20);
+  background-color: rgba(128, 128, 128, 0.30);
 }
 
 .oneswitch-panel-title-button:first-child:hover {
