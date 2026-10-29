@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { filterAndRank, composeResults, dropTabbedBrowserWindows, browserOfWindow } from '../oneswitch@birkey.co/lib/model.js';
+import { filterAndRank, composeResults, dropTabbedBrowserWindows, browserOfWindow, tabItems } from '../oneswitch@birkey.co/lib/model.js';
+import { preselectIndexWithTabs } from '../oneswitch@birkey.co/lib/recency.js';
 
 const items = [
   { id: 1, title: 'Inbox — Gmail', appName: 'Firefox' },
@@ -103,4 +104,73 @@ test('drops every window of a covered browser (tabs stand for all of them)', () 
 test('a tab without a browser field never drops anything', () => {
   const kept = dropTabbedBrowserWindows([firefoxWindow], [{ id: 'tab-x', kind: 'tab' }]);
   assert.deepEqual(kept.map(w => w.id), ['win-1']);
+});
+
+// --- bridge snapshot → tab rows (lib/model.js tabItems) ---
+
+const snapshot = [
+  { tabId: 1, windowId: 11, title: 'SRVIC', url: 'https://srvic.org/', active: false },
+  { tabId: 2, windowId: 11, title: 'Inbox — Gmail', url: 'https://mail.google.com/', active: true },
+];
+
+const browserWin = {
+  id: 'w-ff', kind: 'window', windowId: 862, title: 'browser',
+  appName: 'Firefox Developer Edition', appId: 'firefox-devedition.desktop',
+};
+const emacsWin = {
+  id: 'w-emacs', kind: 'window', windowId: 863, title: 'emacs',
+  appName: 'Emacs', appId: 'emacs.desktop',
+};
+
+test('tabItems copies every field the switcher reads', () => {
+  assert.deepEqual(tabItems('firefox', snapshot)[0], {
+    id: 'tab-firefox-1',
+    kind: 'tab',
+    title: 'SRVIC',
+    appName: 'Firefox',
+    url: 'https://srvic.org/',
+    tabId: 1,
+    browserWindowId: 11,
+    browser: 'firefox',
+    active: false,
+  });
+});
+
+test('tabItems flags the browser active tab', () => {
+  assert.deepEqual(tabItems('firefox', snapshot).map(t => t.active), [false, true]);
+});
+
+test('tabItems copes with a sparse snapshot and an empty one', () => {
+  const [row] = tabItems('chrome', [{ tabId: 7, windowId: 3 }]);
+  assert.equal(row.active, false);
+  assert.equal(row.title, '');
+  assert.equal(row.url, '');
+  assert.equal(row.appName, 'Google Chrome');
+  assert.deepEqual(tabItems('firefox', null), []);
+  assert.deepEqual(tabItems('firefox', []), []);
+});
+
+// The regression this shape exists for: the browser window is dropped from the
+// list, so a Ctrl+Tab bounce has to land on the tab the browser is showing. It
+// did not, for as long as the rows were built inline in browser.js without
+// `active`: preselectIndexWithTabs() fell through to the browser's first tab.
+test('rows from a bridge snapshot preselect the tab the browser is showing', () => {
+  const tabs = tabItems('firefox', snapshot);
+  const wins = [emacsWin, browserWin];
+  const kept = dropTabbedBrowserWindows(wins, tabs);
+  const idx = preselectIndexWithTabs(wins.concat(tabs), kept, tabs, emacsWin.windowId);
+  const chosen = kept.concat(tabs)[idx];
+  assert.equal(chosen.kind, 'tab');
+  assert.equal(chosen.url, 'https://mail.google.com/');
+  assert.equal(chosen.active, true);
+});
+
+test('a snapshot that flags no active tab still lands on a tab, not a window', () => {
+  const tabs = tabItems('firefox', snapshot.map(t => ({ ...t, active: false })));
+  const wins = [emacsWin, browserWin];
+  const kept = dropTabbedBrowserWindows(wins, tabs);
+  const idx = preselectIndexWithTabs(wins.concat(tabs), kept, tabs, emacsWin.windowId);
+  const chosen = kept.concat(tabs)[idx];
+  assert.equal(chosen.kind, 'tab');
+  assert.equal(chosen.url, 'https://srvic.org/');   // documented fallback: first tab
 });

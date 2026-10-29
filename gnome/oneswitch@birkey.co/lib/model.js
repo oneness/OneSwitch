@@ -63,3 +63,29 @@ export function dropTabbedBrowserWindows(windows, tabs) {
   if (covered.size === 0) return windows;
   return windows.filter(w => !covered.has(browserOfWindow(w)));
 }
+
+// Bridge snapshot → tab rows: the other half of browserOfWindow(). These rows are
+// what the switcher ranks, drops and preselects from, and a field missing here is
+// silently inert rather than an error — `active` was exactly that, and every
+// Ctrl+Tab bounce went to the browser's first tab instead of the tab you were on.
+// So every field a consumer reads is copied by name, and test/model.test.js asserts
+// the shape.
+export function tabItems(browser, snapshotTabs) {
+  const appName = browser === 'firefox' ? 'Firefox' : 'Google Chrome';
+  return (snapshotTabs || []).map(t => ({
+    id: `tab-${browser}-${t.tabId}`,
+    kind: 'tab',
+    title: t.title || '',
+    appName,
+    url: t.url || '',
+    tabId: t.tabId,
+    // Named for the browser window on purpose: `windowId` on a window row is
+    // Meta's window id, and preselectIndex() compares it against the focused
+    // window — the browser's own numbering must not be mistaken for that.
+    browserWindowId: t.windowId,
+    browser,
+    // Which tab the browser is showing. preselectIndexWithTabs() needs it to turn
+    // a dropped browser window into the tab you were actually on.
+    active: !!t.active,
+  }));
+}

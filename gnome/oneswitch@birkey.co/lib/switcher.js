@@ -107,9 +107,17 @@ export class SwitcherPopup {
     this._opening = false;
     this._items = composeResults(this._all, this._apps, '');
     this._selected = Math.max(0, Math.min(selected, this._items.length - 1));
+    // `activeTabs` is the canary for the bug this line exists to catch: the
+    // snapshot must flag exactly one of the browser's tabs, and `active=` says
+    // whether the preselected row is that one. Both at 0/false means a dropped
+    // field upstream, not a wrong tab.
+    const sel = this._items[this._selected];
     log(`[OneSwitch] open: focusedId=${focused} preselect=${this._selected} ` +
         `windows=${this._all.length - this._tabs.length} tabs=${this._tabs.length} ` +
-        `item="${this._items[this._selected]?.title}" item0="${this._items[0]?.title}" item1="${this._items[1]?.title}"`);
+        `activeTabs=${this._tabs.filter(t => t.active).length} ` +
+        `item="${sel?.title}" kind=${sel?.kind ?? '-'}` +
+        `${sel?.kind === 'tab' ? ` active=${!!sel.active}` : ''} ` +
+        `item0="${this._items[0]?.title}" item1="${this._items[1]?.title}"`);
 
     // Show the popup before building the rows, and re-apply the highlight once the
     // rows are mapped and the layout has run (below). The highlight needs a mapped,

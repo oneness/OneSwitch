@@ -1,6 +1,6 @@
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
-import { faviconKey } from './favicons.js';
+import { tabItems } from './model.js';
 
 const BROWSERS = ['chrome', 'firefox'];
 
@@ -50,20 +50,9 @@ export function listTabs() {
     // a snapshot hours old is normal after a long read (probe.py decides).
     const age = resp.ts ? Math.round((Date.now() - resp.ts) / 1000) : -1;
     log(`[OneSwitch] browser: ${browser}: ${resp.tabs.length} tab(s), snapshot age ${age}s, pushes ${resp.pushes}`);
-    const appName = browser === 'firefox' ? 'Firefox' : 'Google Chrome';
-    for (const t of resp.tabs) {
-      out.push({
-        id: `tab-${browser}-${t.tabId}`,
-        kind: 'tab',
-        title: t.title || '',
-        appName,
-        url: t.url || '',
-        tabId: t.tabId,
-        browserWindowId: t.windowId,
-        browser,
-        faviconHost: faviconKey(t.url),
-      });
-    }
+    // Row shape lives in model.js so it can be unit-tested: a field dropped while
+    // translating here is invisible until the popup picks the wrong row.
+    out.push(...tabItems(browser, resp.tabs));
   }
   return out;
 }
