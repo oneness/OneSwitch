@@ -9,13 +9,17 @@ Press **Control+Tab** (configurable) to open a centered popup. Type to filter, n
 ### Window switcher & app launcher
 
 - Lists every open window MRU-first with app icons.
-- The previous window is preselected, so Control+Tab → Enter bounces between your two most recent windows.
+- The previous window is preselected, so Control+Tab → Enter bounces between your two most recent windows — or between your two most recent *tabs*, when the last two things you were on were tabs of the same browser.
 - Typing a query also surfaces installed-but-not-running apps; Enter launches them.
 - Orderless token search: space-separated terms match in any order against window title and app name.
 
 ### Browser tabs
 
-Chrome and Firefox tabs appear inline with page favicons. Icons come from the browser (`favIconUrl`), are cached on disk per host, and are normalised at ingest by the native host: sites that serve `.ico` files get their largest embedded PNG frame extracted (`native-host/favicon-format.js`), because gdk-pixbuf's ICO loader rejects the PNG-compressed frames modern `.ico` files use. Sites with no usable icon at all get a generic globe, so a row never loses its icon slot. Requires the WebExtension and native host bridge (see [Browser tabs setup](#browser-tabs-setup)).
+Chrome and Firefox tabs appear inline with page favicons. Icons come from the browser (`favIconUrl`), are cached on disk per host, and are normalised at ingest by the native host: sites that serve `.ico` files get their largest embedded PNG frame extracted (`native-host/favicon-format.js`), because gdk-pixbuf's ICO loader rejects the PNG-compressed frames modern `.ico` files use. Sites with no usable icon at all get a generic globe, so a row never loses its icon slot.
+
+The bounce works inside the browser too. Firefox's tab MRU is not exposed, so the WebExtension remembers the tab each window was showing before the current one and marks it in the snapshot; Control+Tab opened from inside that browser preselects it. The mark is dropped as soon as the browser loses focus, so a detour through another application still bounces back to that application rather than to an older tab, and a tab opened from the popup while another window had focus counts as arriving from that window, not from a tab.
+
+Requires the WebExtension and native host bridge (see [Browser tabs setup](#browser-tabs-setup)).
 
 ### Command mode
 
@@ -154,6 +158,8 @@ Once both are running a Unix socket appears at `$XDG_RUNTIME_DIR/oneswitch-brows
 **Chrome:** `chrome://extensions` → Developer mode → *Load unpacked* → `gnome/webext/`
 
 **Firefox:** `about:debugging` → This Firefox → *Load Temporary Add-on* → `gnome/webext/manifest.json`
+
+The bridge version is in `webext/manifest.json`; bumping it is what makes a browser installed from the packaged `.xpi` pick up new bridge code on the next restart. A temporary add-on only lives until Firefox exits.
 
 ## Dev loop (no logout needed)
 

@@ -55,6 +55,46 @@ function faviconHost(url) {
   return m ? m[1] : null;
 }
 
+// --- tab recency -----------------------------------------------------------
+// The window manager's MRU only knows windows, so "the tab I was on before this
+// one" has to come from here. We remember the previously active tab per window
+// and ship it as a flag on the snapshot ({prev: true}); the Shell turns that into
+// the Ctrl+Tab target when the popup is opened from inside the browser.
+//
+// Two rules keep that memory honest:
+//   - losing focus to another application forgets it, so Ctrl+Tab in the browser
+//     goes back to that application rather than to a tab you left two steps ago;
+//   - a switch requested by the bridge only counts as tab-to-tab when the popup
+//     was opened from this browser (the Shell says so in `sameBrowser`), because
+//     when it was opened from another window, that window is the thing to return
+//     to.
+let prevTab = null;            // { windowId, tabId } — the tab before the current one
+const lastActive = new Map();  // windowId -> tabId, as of the last event we saw
+let pendingPrev = null;        // 'keep' | 'clear' — set by the bridge, consumed by the next activation
+
+api.tabs.onActivated.addListener(info => {
+  const { windowId, tabId } = info;
+  const was = lastActive.get(windowId);
+  lastActive.set(windowId, tabId);
+  const verdict = pendingPrev;
+  pendingPrev = null;
+  if (verdict === 'clear') { prevTab = null; return; }
+  prevTab = was != null && was !== tabId ? { windowId, tabId: was } : null;
+});
+
+api.windows.onFocusChanged.addListener(windowId => {
+  if (windowId === api.windows.WINDOW_ID_NONE) prevTab = null;
+});
+
+api.tabs.onRemoved.addListener((tabId, info) => {
+  if (prevTab && prevTab.tabId === tabId) prevTab = null;
+  if (lastActive.get(info.windowId) === tabId) lastActive.delete(info.windowId);
+});
+
+function prevTabDescription() {
+  return prevTab ? `${prevTab.windowId}:${prevTab.tabId}` : '-';
+}
+
 async function pushTabs(trigger) {
   if (!port) { sendLog(`push skipped: no port (trigger=${trigger})`); return; }
   const mySeq = ++seq;
@@ -82,6 +122,9 @@ async function pushTabs(trigger) {
     // Lets the switcher preselect the tab you were actually on when a browser
     // window is represented by its tabs (Ctrl+Tab must not move you elsewhere).
     active: !!t.active,
+    // The tab this window was showing before the current one, so Ctrl+Tab opened
+    // from inside the browser can bounce between two tabs (see tab recency above).
+    prev: !!prevTab && prevTab.windowId === t.windowId && prevTab.tabId === t.id,
   }));
   const wins = new Set(list.map(t => t.windowId)).size;
   // `trigger` travels with the snapshot so the host can say why a count changed
@@ -89,7 +132,7 @@ async function pushTabs(trigger) {
   const msg = { type: 'tabs', trigger, tabs: list };
   const bytes = JSON.stringify(msg).length;
   sendLog(`push#${mySeq} trigger=${trigger} tabs=${list.length} windows=${wins} ` +
-          `inflight=${inflight} ms=${Date.now() - t0} bytes=${bytes}`);
+          `prev=${prevTabDescription()} inflight=${inflight} ms=${Date.now() - t0} bytes=${bytes}`);
   // A drop on tabs.onRemoved is just a closed tab. On any other trigger it means
   // a slower, older query resolved last — the one way the list can go backwards.
   if (list.length < lastCount && trigger !== 'tabs.onRemoved') {
@@ -132,7 +175,12 @@ async function sendFavicons(hosts) {
 function onHostMessage(msg) {
   if (!msg) return;
   if (msg.type === 'activate') {
-    sendLog(`activate: tabId=${msg.tabId} windowId=${msg.windowId}`);
+    sendLog(`activate: tabId=${msg.tabId} windowId=${msg.windowId} sameBrowser=${!!msg.sameBrowser}`);
+    // Decided here, consumed by the tabs.onActivated that follows. The timer is a
+    // safety valve: activating the already-active tab fires no event, and without
+    // it the verdict would sit around and mislabel the next switch you make.
+    pendingPrev = msg.sameBrowser ? 'keep' : 'clear';
+    setTimeout(() => { pendingPrev = null; }, 2000);
     api.tabs.update(msg.tabId, { active: true });
     api.windows.update(msg.windowId, { focused: true });
   } else if (msg.type === 'want-favicons') {

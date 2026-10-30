@@ -87,5 +87,9 @@ export function tabItems(browser, snapshotTabs) {
     // Which tab the browser is showing. preselectIndexWithTabs() needs it to turn
     // a dropped browser window into the tab you were actually on.
     active: !!t.active,
+    // The tab this window showed before the current one (webext/background.js).
+    // While the popup is opened from inside the browser this is the only thing
+    // that can answer "the last two things I was on were two tabs".
+    previous: !!t.prev,
   }));
 }

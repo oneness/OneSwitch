@@ -77,3 +77,34 @@ test('indices stay correct when a window before the target is dropped', () => {
   const full = [ffWin, term, tabA, tabB];
   assert.equal(preselectIndexWithTabs(full, [term], [tabA, tabB], 1), 0);
 });
+
+// --- inside a browser: the tab you left is the context ----------------------
+// The window MRU cannot answer "the last two things were two tabs": for a focused
+// browser it only offers the window you came from. The webext marks the previous
+// tab, and only while you stayed in that browser, so the mark means what it says.
+
+const tabPrev = {
+  id: 'tab-firefox-1', kind: 'tab', browser: 'firefox', title: 'a',
+  active: false, previous: true,
+};
+
+test('from inside the browser, the tab you left wins over the MRU window', () => {
+  const tabs = [tabPrev, { ...tabB }];          // a = previous, b = active
+  const full = [ffWin, term, ...tabs];
+  const idx = preselectIndexWithTabs(full, [term], tabs, ffWin.windowId);
+  assert.equal(idx, 1);                          // kept = [term], then tabA
+  assert.equal([term, ...tabs][idx].id, tabPrev.id);
+});
+
+test('a previous tab of another browser is ignored', () => {
+  const tabs = [{ ...tabPrev, browser: 'chrome' }, { ...tabB }];
+  const full = [ffWin, term, ...tabs];
+  assert.equal(preselectIndexWithTabs(full, [term], tabs, ffWin.windowId), 0);  // the terminal
+});
+
+test('the previous tab does not hijack a choice made from a normal window', () => {
+  const tabs = [tabPrev, { ...tabB }];
+  const full = [term, ffWin, ...tabs];
+  const idx = preselectIndexWithTabs(full, [term], tabs, term.windowId);
+  assert.equal([term, ...tabs][idx].id, tabB.id);   // its active tab, not the previous one
+});

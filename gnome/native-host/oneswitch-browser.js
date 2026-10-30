@@ -299,8 +299,9 @@ service.connect('incoming', (_s, conn) => {
       dlog(`serve list: tabs=${latestTabs.length} lastPushAge=${age}s pushes=${pushes}`);
       dout.write_all(JSON.stringify({ browser, tabs: latestTabs, ts: lastPushMs, pushes }) + '\n', null);
     } else if (req.cmd === 'activate') {
-      dlog(`serve activate: tabId=${req.tabId} windowId=${req.windowId}`);
-      toBrowser({ type: 'activate', tabId: req.tabId, windowId: req.windowId });
+      dlog(`serve activate: tabId=${req.tabId} windowId=${req.windowId} sameBrowser=${!!req.sameBrowser}`);
+      toBrowser({ type: 'activate', tabId: req.tabId, windowId: req.windowId,
+                  sameBrowser: !!req.sameBrowser });
       dout.write_all('{"ok":true}\n', null);
     } else {
       dlog(`serve: unknown cmd=${req.cmd}`);

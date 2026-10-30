@@ -19,6 +19,18 @@ export function preselectIndex(items, focusedId) {
 // active one, or the browser's first if the webext did not say. `full` is the
 // pre-drop list (windows then tabs, MRU order), so the MRU decision is unchanged.
 export function preselectIndexWithTabs(full, kept, tabs, focusedId) {
+  // Inside a browser, the previous context is a tab, not a window: the MRU list
+  // has nothing better to offer than the window you came from, which is wrong when
+  // the last two things were two tabs of the same browser. The webext marks that
+  // tab, and only keeps the mark while you stayed in the browser — so when it is
+  // present it really is the most recent context.
+  const focused = (full || []).find(it => it.kind === 'window' && it.windowId === focusedId);
+  const focusedBrowser = focused ? browserOfWindow(focused) : null;
+  if (focusedBrowser) {
+    const previous = (tabs || []).find(t => t.browser === focusedBrowser && t.previous);
+    if (previous) return kept.length + tabs.indexOf(previous);
+  }
+
   const target = full[preselectIndex(full, focusedId)];
   if (!target) return 0;
   if (target.kind !== 'window') {

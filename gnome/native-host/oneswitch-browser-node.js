@@ -92,7 +92,8 @@ const server = net.createServer(conn => {
     if (req.cmd === 'list') {
       conn.end(JSON.stringify({ browser, tabs: latestTabs }) + '\n');
     } else if (req.cmd === 'activate') {
-      toBrowser({ type: 'activate', tabId: req.tabId, windowId: req.windowId });
+      toBrowser({ type: 'activate', tabId: req.tabId, windowId: req.windowId,
+                  sameBrowser: !!req.sameBrowser });
       conn.end('{"ok":true}\n');
     } else {
       conn.end('{"ok":false}\n');

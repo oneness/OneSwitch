@@ -57,6 +57,14 @@ export function listTabs() {
   return out;
 }
 
-export function activateTab(item) {
-  request(item.browser, { cmd: 'activate', tabId: item.tabId, windowId: item.browserWindowId });
+// `sameBrowser` says the popup was opened from this browser, which the webext
+// needs to know whether the tab you are leaving is a bounce target or whether the
+// window you came from is (see the tab-recency block in webext/background.js).
+export function activateTab(item, { sameBrowser = false } = {}) {
+  request(item.browser, {
+    cmd: 'activate',
+    tabId: item.tabId,
+    windowId: item.browserWindowId,
+    sameBrowser: !!sameBrowser,
+  });
 }

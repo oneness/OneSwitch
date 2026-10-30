@@ -133,11 +133,17 @@ test('tabItems copies every field the switcher reads', () => {
     browserWindowId: 11,
     browser: 'firefox',
     active: false,
+    previous: false,
   });
 });
 
 test('tabItems flags the browser active tab', () => {
   assert.deepEqual(tabItems('firefox', snapshot).map(t => t.active), [false, true]);
+});
+
+test('tabItems carries the browser previous-tab mark', () => {
+  const marked = [{ ...snapshot[0], prev: true }, { ...snapshot[1], prev: false }];
+  assert.deepEqual(tabItems('firefox', marked).map(t => t.previous), [true, false]);
 });
 
 test('tabItems copes with a sparse snapshot and an empty one', () => {

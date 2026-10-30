@@ -266,7 +266,7 @@ export class SwitcherPopup {
     this.close();
     if (!it) return;
     if (it.kind === 'tab') {
-      Browser.activateTab(it);
+      Browser.activateTab(it, { sameBrowser: Windows.focusedIsBrowser(it.browser) });
       Windows.raiseBrowserWindow(it.browser, it.title);
       return;
     }

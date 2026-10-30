@@ -1,6 +1,7 @@
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import { browserOfWindow } from './model.js';
 
 export function listWindows() {
   const tracker = Shell.WindowTracker.get_default();
@@ -27,6 +28,17 @@ export function listWindows() {
 export function focusedWindowId() {
   const w = global.display.get_focus_window();
   return w ? w.get_id() : null;
+}
+
+// Whether the popup was opened from this browser. The bridge asks before
+// activating a tab: from inside the browser the previous context is a tab, from
+// another window it is that window, so the tab memory has to be kept or dropped.
+export function focusedIsBrowser(browser) {
+  const w = global.display.get_focus_window();
+  if (!w) return false;
+  const app = Shell.WindowTracker.get_default().get_window_app(w);
+  const of = browserOfWindow({ appName: app ? app.get_name() : '', appId: app ? app.get_id() : '' });
+  return of != null && of === browser;
 }
 
 export function activate(metaWindow) {
