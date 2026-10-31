@@ -53,19 +53,66 @@ export function browserOfWindow(w) {
   return null;
 }
 
-// A browser window whose tabs we list is a redundant row: its title is the
-// active tab's title plus a suffix, so the active tab appears twice. Drop the
-// window and let its tabs stand for it. A browser we have no tabs for keeps its
-// window, so a failed tab enumeration never loses the window — the same rule as
-// the macOS WindowManager.allItems() exclusion list.
-export function dropTabbedBrowserWindows(windows, tabs) {
-  const covered = new Set((tabs || []).map(t => t && t.browser).filter(Boolean));
-  if (covered.size === 0) return windows;
-  return windows.filter(w => !covered.has(browserOfWindow(w)));
+// The list the switcher shows, in recency order. A browser window whose tabs we can
+// list must not also be a row: its title is the active tab's title plus a suffix, so
+// the active tab would appear twice. Its slot is filled by its tabs in recency order
+// — the tab it is showing, then the tab it was showing before — and that is the
+// whole point of the two-tab bounce: leaving the second one in strip order put it at
+// row 4, or row 9 of an 18-row list, so Ctrl+Tab between two tabs of one browser
+// landed deep in the list while the top two rows said otherwise. Those two are the
+// only ones the bridges report recency for; the rest follow the windows in strip
+// order. In the macOS build the tab rows carry their browser window's AX element and
+// so sort into that window's MRU slot — the same rule.
+//
+// The `previous` mark is only kept while you stayed in that browser (see the tab
+// recency block in webext/background.js), so when it is present it really is the
+// next most recent context — ahead of the other windows, which is where it goes.
+// A browser we have no tabs for keeps its window, so a failed tab enumeration never
+// loses the window; the same rule as the macOS WindowManager.allItems() list.
+export function orderWithTabs(windows, tabs) {
+  const blocks = new Map();          // browser -> its tabs, in strip order
+  for (const t of tabs || []) {
+    if (!t || !t.browser) continue;
+    if (!blocks.has(t.browser)) blocks.set(t.browser, []);
+    blocks.get(t.browser).push(t);
+  }
+
+  const prefix = new Map();          // browser -> the rows filling its window slot
+  const out = [];
+  for (const w of windows || []) {
+    const browser = browserOfWindow(w);
+    const block = browser ? blocks.get(browser) : null;
+    if (!block || block.length === 0) { out.push(w); continue; }
+    // Every window of a covered browser resolves to the same block, so only the
+    // first one carries it; the rest would duplicate the run of tabs.
+    if (prefix.has(browser)) continue;
+    const head = tabPrefix(block);
+    prefix.set(browser, head);
+    out.push(...head);
+  }
+
+  for (const [browser, block] of blocks) {
+    const head = prefix.get(browser) || [];
+    for (const t of block) if (!head.includes(t)) out.push(t);
+  }
+  return out;
+}
+
+// The rows that fill a browser's window slot: the tab it is showing, then the one
+// it was showing before. Both fall back to the first tab when nothing is flagged,
+// and `previous` is skipped if it names the same tab or is absent. Several windows
+// of one browser can put more than one `previous` in the snapshot; only the first
+// is hoisted here — the rest keep strip order with the other tabs.
+function tabPrefix(block) {
+  const active = block.find(t => t.active) || block[0];
+  const head = [active];
+  const previous = block.find(t => t.previous && t !== active);
+  if (previous) head.push(previous);
+  return head;
 }
 
 // Bridge snapshot → tab rows: the other half of browserOfWindow(). These rows are
-// what the switcher ranks, drops and preselects from, and a field missing here is
+// what the switcher orders and preselects from, and a field missing here is
 // silently inert rather than an error — `active` was exactly that, and every
 // Ctrl+Tab bounce went to the browser's first tab instead of the tab you were on.
 // So every field a consumer reads is copied by name, and test/model.test.js asserts

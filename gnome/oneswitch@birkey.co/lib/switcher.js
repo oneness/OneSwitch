@@ -2,10 +2,9 @@ import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 import Shell from 'gi://Shell';
-import GObject from 'gi://GObject';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import { composeResults, dropTabbedBrowserWindows } from './model.js';
+import { composeResults, orderWithTabs } from './model.js';
 import { preselectIndexWithTabs } from './recency.js';
 import { parseQuery } from './query.js';
 import { matchCommands } from './history.js';
@@ -21,7 +20,7 @@ import { DESKTOP_INTERFACE_SCHEMA, COLOR_SCHEME_KEY, applyPalette } from './them
 // Tells you which build the Shell actually has in memory: modules are imported
 // once per session, so after editing extension code this line only reappears
 // after a real reload (log out/in on Wayland).
-log('[OneSwitch] switcher module loaded (build with window/tab dedupe)');
+log('[OneSwitch] switcher module loaded (build with recency-ordered tab prefix, scroll reset)');
 
 export class SwitcherPopup {
   constructor() {
@@ -86,15 +85,14 @@ export class SwitcherPopup {
     const focused = Windows.focusedWindowId();
     const wins = Windows.listWindows();
     const tabs = Browser.listTabs();
-    // Pick the target on the *full* list first: a browser window is still "the
-    // previous window" even though we no longer list it (its tabs stand for it).
-    // Then drop the tabbed browser windows and translate that target to the
-    // browser's active tab, so Ctrl+Tab still bounces back where you were.
-    const full = wins.concat(tabs);
-    const kept = dropTabbedBrowserWindows(wins, tabs);
-    const selected = preselectIndexWithTabs(full, kept, tabs, focused);
-    this._all = kept.concat(tabs);
-    this._tabs = tabs;
+    // Build the list first, then pick in it. A browser window whose tabs we have is
+    // replaced in place by those tabs in recency order (model.js orderWithTabs), so
+    // its slot keeps its recency; the rest of its tabs trail the windows. Picking
+    // against the same list is what makes the two most recent contexts — window,
+    // browser tab, or two tabs of one browser — the top two rows.
+    const ordered = orderWithTabs(wins, tabs);
+    const selected = preselectIndexWithTabs(ordered, wins, tabs, focused);
+    this._all = ordered;
     this._apps = Apps.listApps(Windows.openAppIds());
     this._history = readHistory();
     this._pathCommands = null; // scanned lazily on first command-mode keystroke
@@ -107,21 +105,23 @@ export class SwitcherPopup {
     this._opening = false;
     this._items = composeResults(this._all, this._apps, '');
     this._selected = Math.max(0, Math.min(selected, this._items.length - 1));
-    // `activeTabs` is the canary for the bug this line exists to catch: the
-    // snapshot must flag exactly one of the browser's tabs, and `active=` says
-    // whether the preselected row is that one. Both at 0/false means a dropped
-    // field upstream, not a wrong tab.
+    // Logged because this ordering is not derivable from the popup alone: `head` is
+    // literally the top of the list, which is what "the last two windows should be
+    // the top two rows" is a claim about. `activeTabs` is the canary for a dropped
+    // field upstream — the snapshot must flag exactly one tab per browser.
     const sel = this._items[this._selected];
+    const head = this._items.slice(0, 3)
+      .map((it, i) => `${i}:${it.kind === 'tab' ? '@' : ''}${it.title || '(untitled)'}`);
     log(`[OneSwitch] open: focusedId=${focused} preselect=${this._selected} ` +
-        `windows=${this._all.length - this._tabs.length} tabs=${this._tabs.length} ` +
-        `activeTabs=${this._tabs.filter(t => t.active).length} ` +
+        `windows=${wins.length} rows=${ordered.length} tabs=${tabs.length} ` +
+        `activeTabs=${tabs.filter(t => t.active).length} ` +
         `item="${sel?.title}" kind=${sel?.kind ?? '-'}` +
         `${sel?.kind === 'tab' ? ` active=${!!sel.active}` : ''} ` +
-        `item0="${this._items[0]?.title}" item1="${this._items[1]?.title}"`);
+        `head=[${head.join(' | ')}]`);
 
-    // Show the popup before building the rows, and re-apply the highlight once the
-    // rows are mapped and the layout has run (below). The highlight needs a mapped,
-    // allocated, repainted actor to actually appear — see _highlight().
+    // Show the popup before building the rows: the highlight needs a mapped actor
+    // to paint at all. _render() resets the list's scroll offset and applies the
+    // selection; the idle below re-applies it once the popup's own size is known.
     this._box.visible = true;
     this._render();
 
@@ -132,7 +132,11 @@ export class SwitcherPopup {
         Math.round(monitor.x + (monitor.width  - this._box.width)  / 2),
         Math.round(monitor.y + (monitor.height - this._box.height) / 2),
       );
-      this._highlight();   // rows are mapped/allocated now — make the highlight stick
+      // One more highlight pass after the position is known. Rows are still
+      // unallocated here (the layout that measures them runs after this idle), so
+      // this is not what makes the class stick — the queue_redraw in _highlight is.
+      // Nothing here scrolls: the selection is in the top rows by construction.
+      this._highlight();
       return GLib.SOURCE_REMOVE;
     });
 
@@ -171,6 +175,15 @@ export class SwitcherPopup {
   }
 
   _render() {
+    // The list is rebuilt, so its scroll offset has to be reset with it. The
+    // ScrollView (and therefore its adjustment) is one object for the whole
+    // session — it survives close() — so an offset left behind by wheel-scrolling
+    // the list (or by an older build) is still in effect. Without this, the next
+    // summon opens already scrolled: after wheeling down to row 10 of 19 the
+    // following summon opened with the two most recent rows above the fold, which
+    // reads as the highlight going missing. Every rebuild starts at row 0.
+    const adj = this._adjustment();
+    if (adj) adj.value = 0;
     this._list.destroy_all_children();
     this._rows = [];
     this._items.forEach((it, i) => {
@@ -204,6 +217,14 @@ export class SwitcherPopup {
     this._highlight();
   }
 
+  // The visible list's vertical adjustment — `vscroll` on 3.36+, the plain getter
+  // before that. Used by _render (reset) and _highlight (logging what it sits at).
+  _adjustment() {
+    if (!this._scroll) return null;
+    return this._scroll.vscroll ? this._scroll.vscroll.adjustment
+                                : this._scroll.get_vadjustment();
+  }
+
   _highlight() {
     this._rows.forEach((r, i) => {
       if (i === this._selected) r.add_style_class_name('selected');
@@ -211,25 +232,12 @@ export class SwitcherPopup {
     });
 
     const row = this._rows[this._selected];
-    const adj = this._scroll.vscroll ? this._scroll.vscroll.adjustment
-                                     : this._scroll.get_vadjustment();
+    const adj = this._adjustment();
 
     let info = `sel=${this._selected}/${this._rows.length}`;
     if (row) info += ` y=${row.allocation.y1}..${row.allocation.y2} cls=${row.has_style_class_name('selected')}`;
     info += adj ? ` adj(v=${adj.value} u=${adj.upper} p=${adj.page_size})` : ' adj=nil';
     log(`[OneSwitch] _highlight ${info}`);
-
-    // Scroll the selected row into view, but only once the ScrollView has a real
-    // viewport (page_size > 0). Before layout page_size is 0, which made the old
-    // `ry + h - page_size` branch jump the list so the selected row sat off-screen.
-    if (row && adj && adj.page_size > 0) {
-      const ry = row.allocation.y1;
-      const rh = row.allocation.y2 - row.allocation.y1;
-      if (isFinite(ry) && isFinite(rh)) {
-        if (ry < adj.value) adj.value = ry;
-        else if (ry + rh > adj.value + adj.page_size) adj.value = ry + rh - adj.page_size;
-      }
-    }
 
     // St only invalidates geometry/paint-volume on a style change — it does not
     // queue a redraw for a pure class swap (same geometry), so the highlight can go
