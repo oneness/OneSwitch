@@ -98,11 +98,17 @@ let lastPushMs = 0;
 
 // --- favicon cache ---------------------------------------------------------
 // The webext no longer ships favIconUrl with every snapshot (image data was 99%
-// of it). Instead we ask for the icons we do not have yet, once per site, and
-// write them where the Shell extension reads them:
-// ~/.cache/oneswitch/favicons/<page host>.
+// of it). Instead we ask for the icons we do not have yet and write them where
+// the Shell extension reads them: ~/.cache/oneswitch/favicons/<page host>.
 const favCacheDir = `${GLib.getenv('XDG_CACHE_HOME') || `${GLib.getenv('HOME')}/.cache`}/oneswitch/favicons`;
-const askedFavicons = new Set();
+// A site with no icon at all answers every request with nothing, so remembering
+// that we asked keeps a push from turning into a fetch storm. The cooldown rather
+// than a permanent "asked" bit matters for the other answer: a fetch that failed
+// — a timeout, a 503, Firefox not having the icon yet — is retried later, because
+// writing such a site off for the life of the process is how rows end up stuck on
+// the generic globe.
+const askedFavicons = new Map();          // host -> epoch ms of the last ask
+const FAVICON_RETRY_MS = 30 * 60 * 1000;
 
 function hostOf(url) {
   const m = /^https?:\/\/([^/:]+)/.exec(url || '');
@@ -110,12 +116,16 @@ function hostOf(url) {
 }
 
 function requestMissingFavicons() {
+  const now = Date.now();
   const want = [];
   for (const t of latestTabs) {
     const h = hostOf(t.url);
-    if (!h || askedFavicons.has(h)) continue;
-    askedFavicons.add(h);
-    if (!GLib.file_test(`${favCacheDir}/${h}`, GLib.FileTest.EXISTS)) want.push(h);
+    if (!h) continue;
+    if (GLib.file_test(`${favCacheDir}/${h}`, GLib.FileTest.EXISTS)) continue;
+    const asked = askedFavicons.get(h);
+    if (asked !== undefined && now - asked < FAVICON_RETRY_MS) continue;
+    askedFavicons.set(h, now);
+    want.push(h);
   }
   if (want.length) {
     dlog(`favicons: asking the webext for ${want.length} missing icon(s): ${want.join(' ')}`);
@@ -127,28 +137,34 @@ function writeFavicons(items) {
   if (!Array.isArray(items) || items.length === 0) return;
   try { GLib.mkdir_with_parents(favCacheDir, 0o755); } catch (_e) {}
   let wrote = 0;
-  let unusable = 0;
+  const rejected = [];
   for (const it of items) {
     const host = it && it.host;
     // host becomes a filename: keep it to what a hostname can contain.
     if (!host || !/^[A-Za-z0-9._-]+$/.test(host)) continue;
     const m = /^data:image\/[^;]+;base64,(.+)$/.exec((it && it.dataUrl) || '');
     if (!m) continue;
-    // .ico payloads are rewritten as their PNG frame here: the Shell's image
-    // loader cannot read PNG-compressed ICO frames (see favicon-format.js).
+    // An .ico the loader can read a frame of is written whole, one made only of
+    // PNG frames has its biggest frame pulled out, and anything the Shell could
+    // not paint is dropped here (see favicon-format.js): a file it cannot read
+    // paints nothing at all, while no file falls back to the generic icon.
     const bytes = normalizeFavicon(GLib.base64_decode(m[1]));
-    if (!bytes) { unusable++; continue; }
+    if (!bytes) { rejected.push(host); continue; }
     try {
       if (GLib.file_set_contents(`${favCacheDir}/${host}`, bytes)) wrote++;
     } catch (_e) {}
   }
   dlog(`favicons: wrote ${wrote}/${items.length} icon(s) to ${favCacheDir}` +
-       (unusable ? ` (${unusable} unusable payload(s) skipped)` : ''));
+       (rejected.length ? ` (not paintable, skipped: ${rejected.join(' ')})` : ''));
 }
 
 // Icons cached before the ICO→PNG rewrite are still on disk and would never be
 // re-fetched (the webext is only asked for hosts we lack), so fix them in place.
-function migrateCachedFavicons() {
+// The same pass removes a cached file no loader can paint, which is the leftover
+// of an older build having written an error page or an unsupported format: with
+// the file gone the host asks again, and the answer is now checked before it is
+// written rather than after it has been painted.
+function repairCachedFavicons() {
   let dir;
   try {
     dir = Gio.File.new_for_path(favCacheDir)
@@ -157,22 +173,29 @@ function migrateCachedFavicons() {
     return;   // no cache dir yet
   }
   let rewrote = 0;
+  const removed = [];
   let info;
   while ((info = dir.next_file(null)) !== null) {
     const path = `${favCacheDir}/${info.get_name()}`;
     try {
       const [, bytes] = GLib.file_get_contents(path);
-      const png = normalizeFavicon(bytes);
-      if (!png || png === bytes) continue;   // not an ICO, or nothing to rewrite
-      if (GLib.file_set_contents(path, png)) rewrote++;
+      const fixed = normalizeFavicon(bytes);
+      if (!fixed) {
+        Gio.File.new_for_path(path).delete(null);
+        removed.push(info.get_name());
+      } else if (fixed !== bytes) {
+        if (GLib.file_set_contents(path, fixed)) rewrote++;
+      }
     } catch (_e) {}
   }
   try { dir.close(null); } catch (_e) {}
   if (rewrote) dlog(`favicons: rewrote ${rewrote} cached .ico icon(s) as PNG`);
+  if (removed.length)
+    dlog(`favicons: removed ${removed.length} unpaintable cached icon(s), will re-fetch: ${removed.join(' ')}`);
 }
 
 dlog(`start: browser=${browser} sock=${sockPath} argv=${JSON.stringify(ARGV)}`);
-migrateCachedFavicons();
+repairCachedFavicons();
 
 // --- read framed stdin from the browser ---
 const stdinStream = new Gio.DataInputStream({
@@ -206,6 +229,12 @@ function applyMessage(m, bytes, parseMs) {
       dlog(`WARN tabs#${pushes}: snapshot is EMPTY`);
     requestMissingFavicons();
   } else if (m.type === 'favicons') {
+    // `missing` is the browser's own answer for the hosts it had nothing usable
+    // for, so the log can tell "this site publishes no icon" from "we never got
+    // an answer" — the two reasons a row shows the generic globe.
+    if (Array.isArray(m.missing) && m.missing.length)
+      dlog(`favicons: the browser has no usable icon for ${m.missing.join(', ')} ` +
+           `(will ask again in ${Math.round(FAVICON_RETRY_MS / 60000)} min)`);
     writeFavicons(m.items);
   } else if (m.type === 'log') {
     dlog(`webext: ${m.line}`);

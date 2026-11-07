@@ -148,25 +148,112 @@ async function pushTabs(trigger) {
   }
 }
 
+// One favicon the host can write to disk: {host, dataUrl}, where the data URL is
+// always base64. Firefox's favIconUrl is usually the icon's *URL*, not its data —
+// the browser stores whatever URL the page declared and only inlines the image
+// when the site itself used a data: URL (Gmail, ChatGPT do). Forwarding just the
+// inlined ones is what used to happen here, and it silently dropped everyone
+// else: GitHub serves its icon as an SVG on github.githubassets.com, a WordPress
+// site under /wp-content. Those rows could never get an icon, because the host
+// only asks for sites it has nothing for and the browser answered with nothing.
+//
+// So resolve the URL here, where the browser's own network stack handles TLS,
+// redirects and the HTTP cache. That needs <all_urls> in the manifest: the icon
+// routinely lives on a different origin than the page.
+const ICON_TIMEOUT_MS = 10000;
+const ICON_MAX_BYTES = 512 * 1024;
+
+function bytesFromBase64(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function base64FromBytes(bytes) {
+  let s = '';
+  // Chunked: String.fromCharCode.apply() overflows the argument limit on a big icon.
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+// Bytes plus a mime type, or null when there is nothing usable to send.
+async function faviconPayload(fav) {
+  if (!fav) return null;
+  if (fav.startsWith('data:')) {
+    // Two shapes in the wild: ;base64 (Gmail, ChatGPT) and percent-encoded text
+    // (an inline SVG, which is what Firefox records for sites that declare one).
+    const m = /^data:([^,]*),([\s\S]*)$/.exec(fav);
+    if (!m) return null;
+    const meta = m[1];
+    const mime = (meta.split(';')[0] || '').trim();
+    if (!/^image\//i.test(mime)) return null;
+    try {
+      const bytes = /;base64$/i.test(meta)
+        ? bytesFromBase64(m[2])
+        : new TextEncoder().encode(decodeURIComponent(m[2]));
+      return { bytes, mime };
+    } catch (e) {
+      sendLog(`favicon: inline data URL did not decode (${e && e.message})`);
+      return null;
+    }
+  }
+  if (!/^https?:\/\//i.test(fav)) return null;   // fake-favicon-uri:, moz-icon:, chrome://
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), ICON_TIMEOUT_MS);
+  try {
+    // credentials omitted: an icon host has no business seeing your cookies.
+    const res = await fetch(fav, { signal: abort.signal, credentials: 'omit' });
+    if (!res.ok) {
+      sendLog(`favicon: ${fav} -> HTTP ${res.status}`);
+      return null;
+    }
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const typed = ((res.headers.get('content-type') || '').split(';')[0] || '').trim();
+    // Not judged here: the host sniffs the bytes and drops what no loader can
+    // paint, so an HTML error page served with 200 never reaches the cache.
+    return { bytes, mime: /^image\//i.test(typed) ? typed : 'image/x-icon' };
+  } catch (e) {
+    sendLog(`favicon: ${fav} -> ${e && e.message}`);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Pull, not push: the host names the sites whose icon it is missing, and gets
-// only those, once. Only data: URLs are useful — the host writes them to disk.
+// only those, once. `missing` tells the host which of them the browser has
+// nothing usable for, so its log can distinguish "no icon on the site" from
+// "we never asked" without guessing.
 async function sendFavicons(hosts) {
   const want = new Set(hosts || []);
   if (want.size === 0) return;
   const tabs = await new Promise(resolve => api.tabs.query({}, resolve));
-  const items = [];
-  const seen = new Set();
+  const favOf = new Map();          // host -> the favIconUrl of its first tab
   for (const t of tabs || []) {
     const host = faviconHost(t.url);
-    const fav = t.favIconUrl || '';
-    if (!host || !want.has(host) || seen.has(host) || !fav.startsWith('data:image/')) continue;
-    seen.add(host);
-    items.push({ host, dataUrl: fav });
+    if (!host || !want.has(host) || favOf.has(host)) continue;
+    favOf.set(host, t.favIconUrl || '');
   }
-  sendLog(`favicons: asked for ${want.size} host(s), sending ${items.length} ` +
-          `(${items.reduce((s, i) => s + i.dataUrl.length, 0)} bytes)`);
-  if (port && items.length) {
-    try { port.postMessage({ type: 'favicons', items }); } catch (e) {
+  // Concurrently: one slow icon host must not hold up the rest of the reply.
+  const items = [];
+  const missing = [];
+  await Promise.all([...favOf].map(async ([host, fav]) => {
+    const payload = await faviconPayload(fav);
+    if (!payload) { missing.push(fav ? host : `${host} (no favIconUrl)`); return; }
+    if (payload.bytes.length === 0 || payload.bytes.length > ICON_MAX_BYTES) {
+      sendLog(`favicon: ${host} -> ${payload.bytes.length} bytes, not usable`);
+      missing.push(host);
+      return;
+    }
+    items.push({ host, dataUrl: `data:${payload.mime};base64,${base64FromBytes(payload.bytes)}` });
+  }));
+  sendLog(`favicons: asked for ${want.size} host(s), sending ${items.length}` +
+          (missing.length ? `, nothing for ${missing.join(', ')}` : '') +
+          ` (${items.reduce((s, i) => s + i.dataUrl.length, 0)} bytes)`);
+  if (port && (items.length || missing.length)) {
+    try { port.postMessage({ type: 'favicons', items, missing }); } catch (e) {
       sendLog(`favicons: postMessage THREW ${e && e.message}`);
     }
   }

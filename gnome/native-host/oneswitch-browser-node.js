@@ -24,8 +24,13 @@ let latestTabs = [];
 
 // Favicons are pulled, not pushed: the webext no longer ships favIconUrl with
 // every snapshot (image data was 99% of it). We ask for the sites we do not
-// have yet, once each, and write the data: URLs to disk for the Shell extension.
-const askedFavicons = new Set();
+// have yet and write the data: URLs to disk for the Shell extension.
+//
+// The cooldown rather than a permanent "asked" bit keeps a failed fetch (a
+// timeout, a 503) from being written off for the life of the process; a site
+// with no icon at all just answers nothing again, 30 minutes later.
+const askedFavicons = new Map();          // host -> epoch ms of the last ask
+const FAVICON_RETRY_MS = 30 * 60 * 1000;
 
 function hostOf(url) {
   const m = /^https?:\/\/([^/:]+)/.exec(url || '');
@@ -33,14 +38,18 @@ function hostOf(url) {
 }
 
 function requestMissingFavicons() {
+  const now = Date.now();
   const want = [];
   for (const t of latestTabs) {
     const host = hostOf(t.url);
-    if (!host || askedFavicons.has(host)) continue;
-    askedFavicons.add(host);
+    if (!host) continue;
     let cached = false;
     try { cached = fs.existsSync(path.join(cacheDir, host)); } catch (_) {}
-    if (!cached) want.push(host);
+    if (cached) continue;
+    const asked = askedFavicons.get(host);
+    if (asked !== undefined && now - asked < FAVICON_RETRY_MS) continue;
+    askedFavicons.set(host, now);
+    want.push(host);
   }
   if (want.length) toBrowser({ type: 'want-favicons', hosts: want });
 }
@@ -53,32 +62,35 @@ function writeFavicons(items) {
     if (!host || !/^[A-Za-z0-9._-]+$/.test(host)) continue;   // becomes a filename
     const m = /^data:image\/[^;]+;base64,(.+)$/.exec((it && it.dataUrl) || '');
     if (!m) continue;
-    // .ico payloads are rewritten as their PNG frame: the Shell's image loader
-    // cannot read PNG-compressed ICO frames (see favicon-format.js).
+    // An .ico the loader can read a frame of is written whole, one made only of
+    // PNG frames has its biggest frame pulled out, and what the Shell could not
+    // paint at all is dropped (see favicon-format.js).
     const bytes = normalizeFavicon(Buffer.from(m[1], 'base64'));
     if (!bytes) continue;
     try { fs.writeFileSync(path.join(cacheDir, host), bytes); } catch (_) {}
   }
 }
 
-// Icons cached before the ICO→PNG rewrite would never be re-fetched (webext is
-// only asked for hosts we lack), so fix them in place on startup.
-function migrateCachedFavicons() {
+// Icons cached before the ICO→PNG rewrite would never be re-fetched (the webext
+// is only asked for hosts we lack), so fix them in place on startup. Files no
+// loader can paint are removed for the same reason: without a file the host asks
+// again, and the answer is now checked before it is written.
+function repairCachedFavicons() {
   let names = [];
   try { names = fs.readdirSync(cacheDir); } catch (_) { return; }
   for (const name of names) {
     const file = path.join(cacheDir, name);
     try {
       const bytes = fs.readFileSync(file);
-      const png = normalizeFavicon(bytes);
-      if (!png || png === bytes) continue;   // not an ICO, or nothing to rewrite
-      fs.writeFileSync(file, png);
+      const fixed = normalizeFavicon(bytes);
+      if (!fixed) fs.unlinkSync(file);
+      else if (fixed !== bytes) fs.writeFileSync(file, fixed);
     } catch (_) {}
   }
 }
 
 // --- Unix socket server for the GNOME Shell extension ---
-migrateCachedFavicons();
+repairCachedFavicons();
 try { fs.unlinkSync(sockPath); } catch (_) {}
 const server = net.createServer(conn => {
   let data = '';
