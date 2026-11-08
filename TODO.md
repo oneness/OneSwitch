@@ -1,4 +1,4 @@
-- [ ] Mobile App?
-- [ ] Bookmark and notes sync?
-      read this: https://github.com/atgreen/cloodoo
-- [ ] Fix 2:48 first line cutoff issue
+- [ ] **Polish and Demo Screen** ?
+- [ ] **Publish add-on** ?
+- [ ] **Turn this into an SwitchOrRun agent** ?
+- [ ] **Release 1.0** ?
